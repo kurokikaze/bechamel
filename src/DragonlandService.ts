@@ -102,7 +102,15 @@ export class DragonlandService {
       console.dir(e)
       throw new Error('Failed to accept the challenge')
     }
-    
+  }
+
+  public async accessGame(playerHash: string): Promise<void> {
+    await fetch(`${this.address}/api/game/${playerHash}`, {
+      method: 'GET',
+      headers: {
+        Cookie: this.cookie,
+      },
+    })
   }
 
   public setCookie(cookie: string) {
