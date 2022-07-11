@@ -1,7 +1,17 @@
-import { ACTION_RESOLVE_PROMPT, PROMPT_TYPE_CHOOSE_CARDS } from './const';
-import { DragonlandService } from './DragonlandService'
+import {byName} from 'moonlands/dist/cards'
+import {ACTION_PLAY, ACTION_RESOLVE_PROMPT, PROMPT_TYPE_CHOOSE_CARDS, TYPE_CREATURE, TYPE_RELIC} from './const';
+import {DragonlandService} from './DragonlandService'
 import { GameConnector } from './GameConnector'
 import { GameState } from './GameState';
+
+const STEP_NAME = {
+  ENERGIZE: 0,
+  PRS1: 1,
+  ATTACK: 2,
+  CREATURES: 3,
+  PRS2: 4,
+  DRAW: 5,
+}
 
 function timeout(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -67,10 +77,69 @@ async function play() {
     console.log('keepalive')
     if (gameState && playerId) {
       if (gameState.playerPriority(playerId)) {
-        io.emit('clientAction', {
-          type: 'actions/pass',
-          player: playerId,
-        })
+        const step = gameState.getStep()
+        switch(step) {
+          case STEP_NAME.PRS1: {
+            console.dir(gameState.getPlayableCards())
+            console.dir(byName('Water of Life'))
+            const playable = gameState.getPlayableCards()
+              .map(card => ({
+                ...card,
+                _card: byName(card.card),
+              }))
+              .filter(card => card._card.type === TYPE_RELIC)
+            const relics = gameState.getMyRelicsInPlay().map(card => card._card.name)
+
+            if (playable.some(card => !relics.includes(card._card.name))) {
+              const playableRelic = playable.find(card => !relics.includes(card._card.name))
+              io.emit('clientAction', {
+                type: ACTION_PLAY,
+                payload: {
+                  card: playableRelic?.id,
+                  player: playerId,
+                }
+              })
+            } else {
+              io.emit('clientAction', {
+                type: 'actions/pass',
+                player: playerId,
+              })
+            }
+            break
+          }
+          case STEP_NAME.CREATURES: {
+            console.dir(gameState.getPlayableCards())
+            console.dir(byName('Arbolit'))
+            const availableEnergy = gameState.getMyMagi().data.energy
+            const playable = gameState.getPlayableCards()
+              .map(card => ({
+                ...card,
+                _card: byName(card.card),
+              }))
+              .filter(card => card._card.type === TYPE_CREATURE && card._card.cost && card._card.cost < availableEnergy)
+            if (playable.length) {
+              const playableCreature = playable[0]
+              io.emit('clientAction', {
+                type: ACTION_PLAY,
+                payload: {
+                  card: playableCreature.id,
+                  player: playerId,
+                }
+              })
+            } else {
+              io.emit('clientAction', {
+                type: 'actions/pass',
+                player: playerId,
+              })
+            }
+            break;
+          }
+          default:
+            io.emit('clientAction', {
+              type: 'actions/pass',
+              player: playerId,
+            })
+        }        
       }
 
       if (gameState.waitingForCardSelection()) {
@@ -82,7 +151,7 @@ async function play() {
         })
       }
     }
-  }, 5000)
+  }, 800)
 }
 
 play()

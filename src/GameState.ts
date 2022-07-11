@@ -40,29 +40,30 @@ import {
   ZONE_TYPE_MAGI_PILE,
 } from './const'
 // import { nanoid } from 'nanoid'
+import {byName} from 'moonlands/dist/cards'
 
-const byName = (cardName: string): Card => ({
-  _card: {
-    name: cardName,
-    type: TYPE_CREATURE,
-    region: 'regions/naroom',
-    cost: 0,
-    data: {},
-  },
-  card: cardName,
-  id: 'KciCPul2-w2WLERqo-ZFc',
-  data: {
-    energy: 0,
-    controller: 1,
-    attacked: 0,
-    actionsUsed: [],
-    energyLostThisTurn: 0,
-    defeatedCreature: false,
-    hasAttacked: false,
-    wasAttacked: false,
-  },
-  owner: 1
-})
+// const byName = (cardName: string): Card => ({
+//   _card: {
+//     name: cardName,
+//     type: TYPE_CREATURE,
+//     region: 'regions/naroom',
+//     cost: 0,
+//     data: {},
+//   },
+//   card: cardName,
+//   id: 'KciCPul2-w2WLERqo-ZFc',
+//   data: {
+//     energy: 0,
+//     controller: 1,
+//     attacked: 0,
+//     actionsUsed: [],
+//     energyLostThisTurn: 0,
+//     defeatedCreature: false,
+//     hasAttacked: false,
+//     wasAttacked: false,
+//   },
+//   owner: 1
+// })
 
 const nanoid = () => 'new_nanoid'
 const zonesToConsiderForStaticAbilities = new Set(['inPlay', 'opponentInPlay', 'playerActiveMagi', 'opponentActiveMagi'])
@@ -86,6 +87,7 @@ type Card = {
     defeatedCreature: boolean,
     hasAttacked: boolean,
     wasAttacked: boolean,
+    staticAbilities?: string[]
   },
   owner: number
 }
@@ -115,6 +117,7 @@ type StateRepresentation = {
   activePlayer: number,
   energyPrompt: boolean,
 	prompt: boolean,
+  step: number,
 	promptPlayer: number | null,
 	promptType: null,
 	promptMessage: null,
@@ -170,6 +173,27 @@ export class GameState {
 
   public update(action: any) {
     this.state = this.reducer(this.state, action)
+  }
+
+  public getStep() {
+    return this.state.step
+  }
+
+  public getPlayableCards() {
+    return this.state.zones.playerHand
+  }
+
+  public getMyRelicsInPlay() {
+    return this.state.zones.inPlay
+      .map(card => ({
+        ...card,
+        _card: byName(card.card),
+      }))
+      .filter(card => card._card.type === TYPE_RELIC && card.owner === this.playerId)
+  }
+
+  public getMyMagi() {
+    return this.state.zones.playerActiveMagi[0]
   }
 
   private getZoneName = (serverZoneType: string, source: Card) => {
@@ -340,13 +364,12 @@ export class GameState {
     }
   }
 
-  private applyEffect(state: StateRepresentation, action: Object) {
+  private applyEffect(state: StateRepresentation, action: any): StateRepresentation {
     switch(action.effectType) {
       case EFFECT_TYPE_CARD_MOVED_BETWEEN_ZONES: {
         const sourceZone = this.getZoneName(action.sourceZone, action.sourceCard);
         const destinationZone = this.getZoneName(action.destinationZone, action.destinationCard);
   
-        var packs = [ ...state.packs];
         var staticAbilities = state.staticAbilities || [];
   
         if (zonesToConsiderForStaticAbilities.has(sourceZone)) {
@@ -358,9 +381,7 @@ export class GameState {
             card: byName(action.destinationCard.card),
           });
         }
-        if (sourceZone === 'inPlay' && action.sourceCard.data.controller === window.playerId) {
-          packs = packs.filter(({ leader }) => leader !== action.sourceCard.id);
-        }
+
         return {
           ...state,
           staticAbilities,
@@ -369,7 +390,6 @@ export class GameState {
             [sourceZone]: state.zones[sourceZone].filter(card => card.id !== action.sourceCard.id),
             [destinationZone]: [...state.zones[destinationZone], action.destinationCard],
           },
-          packs,
         };
       }
       case EFFECT_TYPE_START_OF_TURN: {
@@ -378,7 +398,7 @@ export class GameState {
             ...state,
             zones: {
               ...state.zones,
-              inPlay: state.zones.inPlay.map(card => card.data.controller === state.playerId ? ({...card, data: {...card.data, attacked: 0, hasAttacked: false, wasAttacked: false, actionsUsed: []}}) : card),
+              inPlay: state.zones.inPlay.map(card => card.data.controller === this.playerId ? ({...card, data: {...card.data, attacked: 0, hasAttacked: false, wasAttacked: false, actionsUsed: []}}) : card),
               playerActiveMagi: state.zones.playerActiveMagi.map(card => ({...card, data: {...card.data, wasAttacked: false, actionsUsed: []}})),
             },
             activePlayer: action.player,
@@ -504,7 +524,7 @@ export class GameState {
         };
       }
       case EFFECT_TYPE_DISCARD_ENERGY_FROM_CREATURE: {
-        const idsToFind = action.target.length ? action.target.map(({id}) => id) : [action.target.id];
+        const idsToFind = action.target.length ? action.target.map(({id}: Card) => id) : [action.target.id];
   
   
         const inPlay = [...state.zones.inPlay].map(card => idsToFind.includes(card.id) ? {...card, data: {...card.data, energy: Math.max(card.data.energy - action.amount, 0)}} : card);
@@ -556,7 +576,7 @@ export class GameState {
         };
       }
       case EFFECT_TYPE_ADD_ENERGY_TO_CREATURE: {
-        const idsToFind = action.target.length ? action.target.map(({id}) => id) : [action.target.id];
+        const idsToFind = action.target.length ? action.target.map(({id}: Card) => id) : [action.target.id];
   
         const inPlay = [...(state.zones.inPlay || [])].map(card => idsToFind.includes(card.id) ? {...card, data: {...card.data, energy: card.data.energy + action.amount}} : card);
   
