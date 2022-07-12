@@ -1,5 +1,5 @@
 import {byName} from 'moonlands/dist/cards'
-import {ACTION_PLAY, ACTION_RESOLVE_PROMPT, PROMPT_TYPE_CHOOSE_CARDS, TYPE_CREATURE, TYPE_RELIC} from './const';
+import {ACTION_ATTACK, ACTION_PLAY, ACTION_RESOLVE_PROMPT, PROMPT_TYPE_CHOOSE_CARDS, TYPE_CREATURE, TYPE_RELIC} from './const';
 import {DragonlandService} from './DragonlandService'
 import { GameConnector } from './GameConnector'
 import { GameState } from './GameState';
@@ -18,6 +18,12 @@ function timeout(ms: number): Promise<void> {
 }
 
 const NAROOM_DECK = '5f60e45e11283f7c98d9259b'
+
+const addCardData = (card: any) => ({
+  ...card,
+  _card: byName(card.card),
+})
+
 async function play() {
   const dragonlandService = new DragonlandService('http://localhost:3000')
 
@@ -73,6 +79,32 @@ async function play() {
   })
 
 
+  const pass = () => {
+    io.emit('clientAction', {
+      type: 'actions/pass',
+      player: playerId,
+    })
+  }
+
+  const play = (cardId: string) => {
+    io.emit('clientAction', {
+      type: ACTION_PLAY,
+      payload: {
+        card: cardId,
+        player: playerId,
+      }
+    })
+  }
+
+  const attack = (from: string, to: string) => {
+    io.emit('clientAction', {
+      type: ACTION_ATTACK,
+      source: from,
+      target: to,
+      player: playerId,
+    })
+  }
+
   setInterval(() => {
     console.log('keepalive')
     if (gameState && playerId) {
@@ -83,54 +115,51 @@ async function play() {
             console.dir(gameState.getPlayableCards())
             console.dir(byName('Water of Life'))
             const playable = gameState.getPlayableCards()
-              .map(card => ({
-                ...card,
-                _card: byName(card.card),
-              }))
+              .map(addCardData)
               .filter(card => card._card.type === TYPE_RELIC)
             const relics = gameState.getMyRelicsInPlay().map(card => card._card.name)
 
             if (playable.some(card => !relics.includes(card._card.name))) {
               const playableRelic = playable.find(card => !relics.includes(card._card.name))
-              io.emit('clientAction', {
-                type: ACTION_PLAY,
-                payload: {
-                  card: playableRelic?.id,
-                  player: playerId,
-                }
-              })
+              if (playableRelic) {
+                play(playableRelic?.id)
+              } else {
+                pass()
+              }
             } else {
-              io.emit('clientAction', {
-                type: 'actions/pass',
-                player: playerId,
-              })
+              pass()
             }
             break
           }
           case STEP_NAME.CREATURES: {
-            console.dir(gameState.getPlayableCards())
-            console.dir(byName('Arbolit'))
             const availableEnergy = gameState.getMyMagi().data.energy
             const playable = gameState.getPlayableCards()
-              .map(card => ({
-                ...card,
-                _card: byName(card.card),
-              }))
+              .map(addCardData)
               .filter(card => card._card.type === TYPE_CREATURE && card._card.cost && card._card.cost < availableEnergy)
             if (playable.length) {
               const playableCreature = playable[0]
-              io.emit('clientAction', {
-                type: ACTION_PLAY,
-                payload: {
-                  card: playableCreature.id,
-                  player: playerId,
-                }
-              })
+              play(playableCreature.id)
             } else {
-              io.emit('clientAction', {
-                type: 'actions/pass',
-                player: playerId,
-              })
+              pass()
+            }
+            break;
+          }
+          case STEP_NAME.ATTACK: {
+            const myCreatures = gameState.getMyCreaturesInPlay().filter(creature => creature.data.attacked == 0)
+            const enemyCreatures = gameState.getEnemyCreaturesInPlay()
+            const opponentMagi = gameState.getOpponentMagi()
+            if (myCreatures.length) {
+              const randomMy = myCreatures[Math.floor(Math.random() * myCreatures.length)]
+              if (enemyCreatures.length) {
+                const randomOpponent = enemyCreatures[Math.floor(Math.random() * enemyCreatures.length)]
+                attack(randomMy.id, randomOpponent.id)
+              } else if (opponentMagi.id) {
+                attack(randomMy.id, opponentMagi.id)
+              } else {
+                pass()
+              }
+            } else {
+              pass()
             }
             break;
           }

@@ -192,8 +192,30 @@ export class GameState {
       .filter(card => card._card.type === TYPE_RELIC && card.owner === this.playerId)
   }
 
+  public getMyCreaturesInPlay() {
+    return this.state.zones.inPlay
+      .map(card => ({
+        ...card,
+        _card: byName(card.card),
+      }))
+      .filter(card => card._card.type === TYPE_CREATURE && card.owner === this.playerId)
+  }
+
+  public getEnemyCreaturesInPlay() {
+    return this.state.zones.inPlay
+      .map(card => ({
+        ...card,
+        _card: byName(card.card),
+      }))
+      .filter(card => card._card.type === TYPE_CREATURE && card.owner !== this.playerId)
+  }
+
   public getMyMagi() {
     return this.state.zones.playerActiveMagi[0]
+  }
+
+  public getOpponentMagi() {
+    return this.state.zones.opponentActiveMagi[0]
   }
 
   private getZoneName = (serverZoneType: string, source: Card) => {
