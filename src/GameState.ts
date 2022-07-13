@@ -38,6 +38,7 @@ import {
   ZONE_TYPE_DISCARD,
   ZONE_TYPE_HAND,
   ZONE_TYPE_MAGI_PILE,
+  PROMPT_TYPE_SINGLE_CREATURE,
 } from './const'
 // import { nanoid } from 'nanoid'
 import {byName} from 'moonlands/dist/cards'
@@ -163,6 +164,14 @@ export class GameState {
 
   public waitingForCardSelection(): boolean {
     return (this.state.prompt && this.state.promptType === PROMPT_TYPE_CHOOSE_CARDS)
+  }
+
+  public waitingForTarget(byId: string): boolean {
+    return (this.state.prompt && this.state.promptGeneratedBy === byId)
+  }
+
+  public getPromptType() {
+    this.state.prompt ? this.state.promptType : null
   }
 
   public getStartingCards(): string[] {

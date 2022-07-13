@@ -18,8 +18,6 @@ function timeout(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const NAROOM_DECK = '5f60e45e11283f7c98d9259b'
-
 const addCardData = (card: any) => ({
   ...card,
   _card: byName(card.card),
@@ -35,7 +33,7 @@ async function play() {
     console.log("No challenges")
   }
   console.log(`Ready to accept challenge ${challenges[0].deckId}:${challenges[0].user}`)
-  const gameHash = await dragonlandService.acceptChallenge(challenges[0].user, NAROOM_DECK)
+  const gameHash = await dragonlandService.acceptChallenge(challenges[0].user, RandomStrategy.deckId)
   console.log(`Started game ${gameHash}`)
 
   if (!gameHash) {

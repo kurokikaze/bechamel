@@ -18,6 +18,13 @@ const addCardData = (card: any) => ({
 })
 
 export class RandomStrategy {
+  public static deckId = '5f60e45e11283f7c98d9259b'
+
+  private waitingTarget?: {
+    source: string
+    target: string
+  }
+
   private playerId?: number
   private gameState?: GameState
 
@@ -65,6 +72,24 @@ export class RandomStrategy {
     })
   }
 
+  private power(source: string, power: string) {
+    this.io.emit('clientAction', {
+      type: ACTION_ATTACK,
+      source,
+      power,
+      player: this.playerId,
+    })
+  }
+
+  private resolvePrompt(target: string) {
+    this.io.emit('clientAction', {
+      type: ACTION_RESOLVE_PROMPT,
+      promptType: this.gameState?.getPromptType(),
+      target,
+      player: this.playerId,
+    })
+  }
+
   requestAction() {
     if (this.gameState && this.playerId) {
       if (this.gameState.playerPriority(this.playerId)) {
@@ -83,6 +108,22 @@ export class RandomStrategy {
               } else {
                 this.pass()
               }
+            } else {
+              this.pass()
+            }
+            break
+          }
+          case STEP_NAME.PRS2: {
+            const relics = this.gameState.getMyRelicsInPlay().map(card => card._card.name)
+            const enemyCreatures = this.gameState.getEnemyCreaturesInPlay()
+
+            if (relics.some(card => card._card.name === 'Siphon Stone') && enemyCreatures.some(card => card.data.energy === 1)) {
+              const stone = relics.find(card => card.card === 'Siphon Stone')
+              const target =  enemyCreatures.find(card => card.data.energy === 1) || { id: 'wrong target'}
+              stone._card = byName('Siphon Stone')
+
+              this.power(stone.id, stone._card.data.powers[0].name)
+              this.waitingTarget = { source: stone.id, target: target.id}
             } else {
               this.pass()
             }
@@ -137,6 +178,10 @@ export class RandomStrategy {
           cards: this.gameState.getStartingCards(),
           player: this.playerId,
         })
+      }
+
+      if (this.waitingTarget && this.gameState.waitingForTarget(this.waitingTarget.source)) {
+        this.resolvePrompt(this.waitingTarget.target)
       }
     }
   }
