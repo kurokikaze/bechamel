@@ -201,8 +201,10 @@ export class RandomStrategy {
           }
           case STEP_NAME.ATTACK: {
             const myMagi = this.gameState.getMyMagi()
-            const numberOfAttacks = myMagi.card === 'Yaki' ? 2 : 1
-            const myCreatures = this.gameState.getMyCreaturesInPlay().filter(creature => creature.data.attacked < numberOfAttacks)
+            const myCreatures = this.gameState.getMyCreaturesInPlay().filter(creature => {
+              const numberOfAttacks = myMagi.card === 'Yaki' ? 2 : (creature._card.data.numberOfAttacks || 1)
+              return creature.data.attacked < numberOfAttacks
+            })
             const enemyCreatures = this.gameState.getEnemyCreaturesInPlay()
             const opponentMagi = this.gameState.getOpponentMagi()
             if (myCreatures.length) {
