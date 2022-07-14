@@ -153,7 +153,7 @@ export class RandomStrategy {
               switch (ourMagi.card) {
                 case 'Pruitt': {
                   const ourCreatures = [...this.gameState.getMyCreaturesInPlay()]
-                  if (ourCreatures.length > 0 && ourMagi.data.energy >= 2) {
+                  if (ourCreatures.length > 0 && ourMagi.data.energy >= 2 && !ourMagi.data.actionsUsed.includes('Refresh')) {
                     ourCreatures.sort((a, b) => a.data.energy - b.data.energy)
                     this.waitingTarget = {
                       source: ourMagi.id,
@@ -167,7 +167,7 @@ export class RandomStrategy {
                 }
                 case 'Poad': {
                   const ourCreatures = this.gameState.getMyCreaturesInPlay()
-                  if (ourCreatures.length > 2 && ourMagi.data.energy >= 2) {
+                  if (ourCreatures.length > 2 && ourMagi.data.energy >= 2 && !ourMagi.data.actionsUsed.includes('Heroes\' Feast')) {
                     this.power(ourMagi.id, 'Heroes\' Feast')
                   } else {
                     this.pass()
