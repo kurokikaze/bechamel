@@ -53,10 +53,10 @@ async function play() {
 
   const strategy = new RandomStrategy(io)
 
-  setInterval(() => {
-    console.log('keepalive')
-    strategy.requestAction()
-  }, 800)
+  // setInterval(() => {
+  //   console.log('keepalive')
+  //   strategy.requestAction()
+  // }, 800)
 }
 
 play()

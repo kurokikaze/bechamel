@@ -1,7 +1,20 @@
 import {byName} from 'moonlands/dist/cards'
-import {io, Socket} from "socket.io-client";
-import {ACTION_ATTACK, ACTION_PLAY, ACTION_RESOLVE_PROMPT, PROMPT_TYPE_CHOOSE_CARDS, TYPE_CREATURE, TYPE_RELIC} from "./const";
+import {Socket} from "socket.io-client";
+import {ACTION_ATTACK, ACTION_PLAY, ACTION_POWER, ACTION_RESOLVE_PROMPT, PROMPT_TYPE_CHOOSE_CARDS, TYPE_CREATURE, TYPE_RELIC} from "./const";
 import {GameState} from "./GameState";
+
+export const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
+  let timeout: NodeJS.Timeout
+
+  return (...args: Parameters<F>): Promise<ReturnType<F>> =>
+    new Promise(resolve => {
+      if (timeout) {
+        clearTimeout(timeout)
+      }
+
+      timeout = setTimeout(() => resolve(func(...args)), waitFor)
+    })
+}
 
 const STEP_NAME = {
   ENERGIZE: 0,
@@ -31,17 +44,28 @@ export class RandomStrategy {
   constructor(
     private readonly io: Socket,
   ) {
-    io.on('gameData', data => {
+    const dRequestAction = debounce(this.requestAction.bind(this), 100)
+
+    io.on('gameData', (data: {playerId: number, state: any}) => {
       console.log('GameData received')
       console.dir(data)
       this.playerId = data.playerId
       this.gameState = new GameState(data.state)
       this.gameState.setPlayerId(data.playerId)
+
+      console.log('We got the game data')
+      if (this.gameState.playerPriority(this.playerId) || this.gameState.isInPromptState(this.playerId)) {
+        dRequestAction()
+      }
     })
 
     io.on('action', action => {
-      if (this.gameState) {
+      if (this.gameState && this.playerId) {
         this.gameState.update(action)
+
+        if (this.gameState.playerPriority(this.playerId) || this.gameState.isInPromptState(this.playerId)) {
+          dRequestAction()
+        }
       }
     })
   }
@@ -74,7 +98,7 @@ export class RandomStrategy {
 
   private power(source: string, power: string) {
     this.io.emit('clientAction', {
-      type: ACTION_ATTACK,
+      type: ACTION_POWER,
       source,
       power,
       player: this.playerId,
@@ -117,7 +141,7 @@ export class RandomStrategy {
             const relics = this.gameState.getMyRelicsInPlay().map(card => card._card.name)
             const enemyCreatures = this.gameState.getEnemyCreaturesInPlay()
 
-            if (relics.some(card => card._card.name === 'Siphon Stone') && enemyCreatures.some(card => card.data.energy === 1)) {
+            if (relics.some(card => card.card === 'Siphon Stone') && enemyCreatures.some(card => card.data.energy === 1)) {
               const stone = relics.find(card => card.card === 'Siphon Stone')
               const target =  enemyCreatures.find(card => card.data.energy === 1) || { id: 'wrong target'}
               stone._card = byName('Siphon Stone')
@@ -125,7 +149,35 @@ export class RandomStrategy {
               this.power(stone.id, stone._card.data.powers[0].name)
               this.waitingTarget = { source: stone.id, target: target.id}
             } else {
-              this.pass()
+              const ourMagi = this.gameState.getMyMagi()
+              switch (ourMagi.card) {
+                case 'Pruitt': {
+                  const ourCreatures = [...this.gameState.getMyCreaturesInPlay()]
+                  if (ourCreatures.length > 0 && ourMagi.data.energy >= 2) {
+                    ourCreatures.sort((a, b) => a.data.energy - b.data.energy)
+                    this.waitingTarget = {
+                      source: ourMagi.id,
+                      target: ourCreatures[0].id,
+                    }
+                    this.power(ourMagi.id, 'Refresh')
+                  } else {
+                    this.pass()
+                  }
+                  break;
+                }
+                case 'Poad': {
+                  const ourCreatures = this.gameState.getMyCreaturesInPlay()
+                  if (ourCreatures.length > 2 && ourMagi.data.energy >= 2) {
+                    this.power(ourMagi.id, 'Heroes\' Feast')
+                  } else {
+                    this.pass()
+                  }
+                  break;
+                }
+                default: {
+                  this.pass()
+                }
+              }
             }
             break
           }
@@ -148,14 +200,20 @@ export class RandomStrategy {
             break;
           }
           case STEP_NAME.ATTACK: {
-            const myCreatures = this.gameState.getMyCreaturesInPlay().filter(creature => creature.data.attacked == 0)
+            const myMagi = this.gameState.getMyMagi()
+            const numberOfAttacks = myMagi.card === 'Yaki' ? 2 : 1
+            const myCreatures = this.gameState.getMyCreaturesInPlay().filter(creature => creature.data.attacked < numberOfAttacks)
             const enemyCreatures = this.gameState.getEnemyCreaturesInPlay()
             const opponentMagi = this.gameState.getOpponentMagi()
             if (myCreatures.length) {
               const randomMy = myCreatures[Math.floor(Math.random() * myCreatures.length)]
               if (enemyCreatures.length) {
                 const randomOpponent = enemyCreatures[Math.floor(Math.random() * enemyCreatures.length)]
-                this.attack(randomMy.id, randomOpponent.id)
+                if (randomMy._card.data.canAttackMagiDirectly && randomMy.data.energy <= opponentMagi.data.energy) {
+                  this.attack(randomMy.id, opponentMagi.id)
+                } else {
+                  this.attack(randomMy.id, randomOpponent.id)
+                }
               } else if (opponentMagi.id) {
                 this.attack(randomMy.id, opponentMagi.id)
               } else {
@@ -180,7 +238,7 @@ export class RandomStrategy {
         })
       }
 
-      if (this.waitingTarget && this.gameState.waitingForTarget(this.waitingTarget.source)) {
+      if (this.waitingTarget && this.gameState.waitingForTarget(this.waitingTarget.source, this.playerId)) {
         this.resolvePrompt(this.waitingTarget.target)
       }
     }

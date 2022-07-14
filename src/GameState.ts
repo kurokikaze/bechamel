@@ -166,8 +166,12 @@ export class GameState {
     return (this.state.prompt && this.state.promptType === PROMPT_TYPE_CHOOSE_CARDS)
   }
 
-  public waitingForTarget(byId: string): boolean {
-    return (this.state.prompt && this.state.promptGeneratedBy === byId)
+  public isInPromptState(playerId: number): boolean {
+    return (this.state.prompt && this.state.promptPlayer === playerId)
+  }
+
+  public waitingForTarget(byId: string, playerId: number): boolean {
+    return this.isInPromptState(playerId) && this.state.promptGeneratedBy === byId
   }
 
   public getPromptType() {
