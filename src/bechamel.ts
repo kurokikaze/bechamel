@@ -4,6 +4,7 @@ import {DragonlandService} from './DragonlandService'
 import { GameConnector } from './GameConnector'
 import { GameState } from './GameState';
 import { RandomStrategy } from './RandomStrategy';
+import { StrategyConnector } from './StrategyConnector';
 
 const STEP_NAME = {
   ENERGIZE: 0,
@@ -51,12 +52,9 @@ async function play() {
     console.log('Connected, id is ', io.id)
   })
 
-  const strategy = new RandomStrategy(io)
+  const strategyConnector = new StrategyConnector(io)
 
-  // setInterval(() => {
-  //   console.log('keepalive')
-  //   strategy.requestAction()
-  // }, 800)
+  strategyConnector.connect(new RandomStrategy())
 }
 
 play()

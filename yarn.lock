@@ -3787,9 +3787,9 @@ mkdirp@^0.5.1, mkdirp@^0.5.3:
   dependencies:
     minimist "^1.2.6"
 
-"moonlands@https://github.com/kurokikaze/moonlands/archive/refs/tags/v0.8.6.tar.gz":
+"moonlands@https://github.com/kurokikaze/moonlands/archive/refs/tags/v0.8.8.tar.gz":
   version "0.8.6"
-  resolved "https://github.com/kurokikaze/moonlands/archive/refs/tags/v0.8.6.tar.gz#6d3dd835d817810af8d29bb55772d05f03bdbe51"
+  resolved "https://github.com/kurokikaze/moonlands/archive/refs/tags/v0.8.8.tar.gz#972ca026a5d410f1dea53389f68aca8dbbef69e7"
   dependencies:
     "@babel/preset-env" "^7.11.5"
     "@babel/preset-typescript" "^7.12.7"

@@ -1,16 +1,7 @@
 import {byName} from 'moonlands/dist/cards'
-
-import {
-  ACTION_ATTACK,
-  ACTION_PASS,
-  ACTION_PLAY,
-  ACTION_POWER,
-  ACTION_RESOLVE_PROMPT,
-  PROMPT_TYPE_CHOOSE_CARDS,
-  TYPE_CREATURE, TYPE_RELIC
-} from "./const";
+import {Socket} from "socket.io-client";
+import {ACTION_ATTACK, ACTION_PLAY, ACTION_POWER, ACTION_RESOLVE_PROMPT, PROMPT_TYPE_CHOOSE_CARDS, TYPE_CREATURE, TYPE_RELIC} from "./const";
 import {GameState} from "./GameState";
-import {Strategy} from './Strategy';
 
 export const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
   let timeout: NodeJS.Timeout
@@ -39,7 +30,7 @@ const addCardData = (card: any) => ({
   _card: byName(card.card),
 })
 
-export class RandomStrategy implements Strategy {
+export class RandomStrategy {
   public static deckId = '5f60e45e11283f7c98d9259b'
 
   private waitingTarget?: {
@@ -50,72 +41,81 @@ export class RandomStrategy implements Strategy {
   private playerId?: number
   private gameState?: GameState
 
-  constructor() {}
+  constructor(
+    private readonly io: Socket,
+  ) {
+    const dRequestAction = debounce(this.requestAction.bind(this), 100)
 
-  public setup(state: GameState, playerId: number) {
-    this.gameState = state
-    this.playerId = playerId
+    io.on('gameData', (data: {playerId: number, state: any}) => {
+      console.log('GameData received')
+      console.dir(data)
+      this.playerId = data.playerId
+      this.gameState = new GameState(data.state)
+      this.gameState.setPlayerId(data.playerId)
+
+      console.log('We got the game data')
+      if (this.gameState.playerPriority(this.playerId) || this.gameState.isInPromptState(this.playerId)) {
+        dRequestAction()
+      }
+    })
+
+    io.on('action', action => {
+      if (this.gameState && this.playerId) {
+        this.gameState.update(action)
+
+        if (this.gameState.playerPriority(this.playerId) || this.gameState.isInPromptState(this.playerId)) {
+          dRequestAction()
+        }
+      }
+    })
   }
 
-  private pass(): any {
-    return {
-      type: ACTION_PASS,
+  private pass(): void {
+    this.io.emit('clientAction', {
+      type: 'actions/pass',
       player: this.playerId,
-    }
+    })
   }
 
-  private play(cardId: string): any {
-    return {
+  private play(cardId: string): void {
+    this.io.emit('clientAction', {
       type: ACTION_PLAY,
       payload: {
         card: cardId,
         player: this.playerId,
       }
-    }
+    })
   }
 
-  private attack(from: string, to: string): any {
-    return {
+  private attack(from: string, to: string): void {
+    this.io.emit('clientAction', {
       type: ACTION_ATTACK,
       source: from,
       target: to,
       player: this.playerId,
-    }
+    })
   }
 
   private power(source: string, power: string) {
-    return {
+    this.io.emit('clientAction', {
       type: ACTION_POWER,
       source,
       power,
       player: this.playerId,
-    }
+    })
   }
 
   private resolvePrompt(target: string) {
-    return {
+    this.io.emit('clientAction', {
       type: ACTION_RESOLVE_PROMPT,
       promptType: this.gameState?.getPromptType(),
       target,
       player: this.playerId,
-    }
+    })
   }
 
-  public requestAction() {
+  requestAction() {
     if (this.gameState && this.playerId) {
-      if (this.gameState.waitingForCardSelection()) {
-        return {
-          type: ACTION_RESOLVE_PROMPT,
-          promptType: PROMPT_TYPE_CHOOSE_CARDS,
-          cards: this.gameState.getStartingCards(),
-          player: this.playerId,
-        }
-      }
-
-      if (this.waitingTarget && this.gameState.waitingForTarget(this.waitingTarget.source, this.playerId)) {
-        return this.resolvePrompt(this.waitingTarget.target)
-      }
-
       if (this.gameState.playerPriority(this.playerId)) {
         const step = this.gameState.getStep()
         switch(step) {
@@ -129,10 +129,13 @@ export class RandomStrategy implements Strategy {
               const playableRelic = playable.find(card => !relics.includes(card._card.name))
               if (playableRelic) {
                 this.play(playableRelic?.id)
+              } else {
+                this.pass()
               }
-              return this.pass()
+            } else {
+              this.pass()
             }
-            return this.pass()
+            break
           }
           case STEP_NAME.PRS2: {
             const relics = this.gameState.getMyRelicsInPlay().map(card => card._card.name)
@@ -143,8 +146,8 @@ export class RandomStrategy implements Strategy {
               const target =  enemyCreatures.find(card => card.data.energy === 1) || { id: 'wrong target'}
               stone._card = byName('Siphon Stone')
 
+              this.power(stone.id, stone._card.data.powers[0].name)
               this.waitingTarget = { source: stone.id, target: target.id}
-              return this.power(stone.id, stone._card.data.powers[0].name)
             } else {
               const ourMagi = this.gameState.getMyMagi()
               switch (ourMagi.card) {
@@ -156,27 +159,30 @@ export class RandomStrategy implements Strategy {
                       source: ourMagi.id,
                       target: ourCreatures[0].id,
                     }
-                    return this.power(ourMagi.id, 'Refresh')
+                    this.power(ourMagi.id, 'Refresh')
+                  } else {
+                    this.pass()
                   }
-                  return this.pass()
+                  break;
                 }
                 case 'Poad': {
                   const ourCreatures = this.gameState.getMyCreaturesInPlay()
                   if (ourCreatures.length > 2 && ourMagi.data.energy >= 2 && !ourMagi.data.actionsUsed.includes('Heroes\' Feast')) {
-                    return this.power(ourMagi.id, 'Heroes\' Feast')
+                    this.power(ourMagi.id, 'Heroes\' Feast')
+                  } else {
+                    this.pass()
                   }
-                  return this.pass()
+                  break;
                 }
                 default: {
-                  return this.pass()
+                  this.pass()
                 }
               }
             }
+            break
           }
           case STEP_NAME.CREATURES: {
             const myMagi = this.gameState.getMyMagi()
-            console.log('myMagi')
-            console.dir(myMagi)
             myMagi._card = byName(myMagi.card)
             const availableEnergy = myMagi.data.energy
             const playable = this.gameState.getPlayableCards()
@@ -187,9 +193,11 @@ export class RandomStrategy implements Strategy {
               })
             if (playable.length) {
               const playableCreature = playable[0]
-              return this.play(playableCreature.id)
+              this.play(playableCreature.id)
+            } else {
+              this.pass()
             }
-            return this.pass()
+            break;
           }
           case STEP_NAME.ATTACK: {
             const myMagi = this.gameState.getMyMagi()
@@ -204,20 +212,36 @@ export class RandomStrategy implements Strategy {
               if (enemyCreatures.length) {
                 const randomOpponent = enemyCreatures[Math.floor(Math.random() * enemyCreatures.length)]
                 if (randomMy._card.data.canAttackMagiDirectly && randomMy.data.energy <= opponentMagi.data.energy) {
-                  return this.attack(randomMy.id, opponentMagi.id)
+                  this.attack(randomMy.id, opponentMagi.id)
                 } else {
-                  return this.attack(randomMy.id, randomOpponent.id)
+                  this.attack(randomMy.id, randomOpponent.id)
                 }
               } else if (opponentMagi.id) {
-                return this.attack(randomMy.id, opponentMagi.id)
+                this.attack(randomMy.id, opponentMagi.id)
+              } else {
+                this.pass()
               }
-              return this.pass()
+            } else {
+              this.pass()
             }
-            return this.pass()
+            break;
           }
           default:
-            return this.pass()
+            this.pass()
         }
+      }
+
+      if (this.gameState.waitingForCardSelection()) {
+        this.io.emit('clientAction', {
+          type: ACTION_RESOLVE_PROMPT,
+          promptType: PROMPT_TYPE_CHOOSE_CARDS,
+          cards: this.gameState.getStartingCards(),
+          player: this.playerId,
+        })
+      }
+
+      if (this.waitingTarget && this.gameState.waitingForTarget(this.waitingTarget.source, this.playerId)) {
+        this.resolvePrompt(this.waitingTarget.target)
       }
     }
   }
