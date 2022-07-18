@@ -75,20 +75,22 @@ export const getStateScore = (state: State, attacker: number, opponent: number):
   let myScore = 0
   let enemyScore = 0
 
-  let myCreatures = 0
-  let enemyCreatures = 0
+  let myCreatures: string[] = []
+  let enemyCreatures: string[] = []
   const creatures = state.getZone(ZONE_TYPE_IN_PLAY).cards.filter((card: CardInGame) => card.card.type === TYPE_CREATURE)
   creatures.forEach((creature: CardInGame) => {
     if (creature.owner === attacker) {
       myScore += creature.data.energy + CARD_SCORE
-      myCreatures++
+      myCreatures.push(`${creature.card.name}: ${creature.data.energy}`)
     } else {
       enemyScore += creature.data.energy + CARD_SCORE
-      enemyCreatures++
+      enemyCreatures.push(`${creature.card.name}: ${creature.data.energy}`)
     }
   })
 
-  console.log(`Total creatures: ${creatures.length}, mine: ${myCreatures}, enemy: ${enemyCreatures}`)
+  console.log(`Total creatures: ${creatures.length}`)
+  console.log(`My creatures: ${myCreatures.join(', ')}`)
+  console.log(`Enemy creatures: ${enemyCreatures.join(', ')}`)
 
   console.log(`My creatures score: ${myScore}, enemy creatures score: ${enemyScore}`)
 

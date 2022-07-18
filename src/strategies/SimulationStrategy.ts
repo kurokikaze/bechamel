@@ -247,47 +247,9 @@ export class SimulationStrategy implements Strategy {
               const myMagi = this.gameState.getMyMagi()
               const myCreatures = this.gameState.getMyCreaturesInPlay()
 
-              const myCreaturesCards = myCreatures.map(card => {
-                const cardInGame = new CardInGame(byName(card.card), this.playerId).addEnergy(card.data.energy)
-                cardInGame.data.attacked = card.data.attacked
-                cardInGame.data.actionsUsed = [...card.data.actionsUsed]
-                cardInGame.id = card.id
-                return cardInGame
-              })
               const enemyCreatures = this.gameState.getEnemyCreaturesInPlay()
-              console.log('myCreatures')
-              console.dir(myCreatures)
-              const enemyCreaturesCards = enemyCreatures.map(card => {
-                const cardInGame = new CardInGame(byName(card.card), TEMPORARY_OPPONENT_ID).addEnergy(card.data.energy)
-                cardInGame.data.attacked = card.data.attacked
-                cardInGame.data.actionsUsed = [...card.data.actionsUsed]
-                cardInGame.id = card.id
-                return cardInGame
-              })
-              const myMagiCard = new CardInGame(byName(myMagi.card), this.playerId)
-              myMagiCard.data.actionsUsed = myMagi.data.actionsUsed
-              myMagiCard.addEnergy(myMagi.data.energy)
-              myMagiCard.id = myMagi.id
 
-              const enemyMagiCard = new CardInGame(byName(opponentMagi.card), TEMPORARY_OPPONENT_ID)
-              enemyMagiCard.data.actionsUsed = opponentMagi.data.actionsUsed
-              enemyMagiCard.addEnergy(opponentMagi.data.energy)
-              enemyMagiCard.id = opponentMagi.id
-
-              const zones = createZones(
-                this.playerId,
-                TEMPORARY_OPPONENT_ID,
-                [...myCreaturesCards, ...enemyCreaturesCards],
-                [myMagiCard],
-              )
-              const outerSim: State = new State({
-                zones,
-                step: STEP_ATTACK,
-                activePlayer: this.playerId,
-              })
-              outerSim.setPlayers(this.playerId, TEMPORARY_OPPONENT_ID)
-              outerSim.getZone(ZONE_TYPE_ACTIVE_MAGI, TEMPORARY_OPPONENT_ID).add([enemyMagiCard])
-
+              const outerSim = createState(myCreatures, enemyCreatures, myMagi, opponentMagi, this.playerId || 1, TEMPORARY_OPPONENT_ID)
               const attackPatterns = getAllAttackPatterns(outerSim, this.playerId, TEMPORARY_OPPONENT_ID)
               const simulationQueue: SimulationEntity[] = []
               attackPatterns.forEach(pattern => {                
