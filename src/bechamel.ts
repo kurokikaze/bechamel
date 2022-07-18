@@ -1,9 +1,7 @@
-import {byName} from 'moonlands/dist/cards'
-import {ACTION_ATTACK, ACTION_PLAY, ACTION_RESOLVE_PROMPT, PROMPT_TYPE_CHOOSE_CARDS, TYPE_CREATURE, TYPE_RELIC} from './const';
 import {DragonlandService} from './DragonlandService'
 import { GameConnector } from './GameConnector'
-import { GameState } from './GameState';
-import { RandomStrategy } from './RandomStrategy';
+import { RandomStrategy } from './strategies/RandomStrategy';
+import { SimulationStrategy } from './strategies/SimulationStrategy';
 import { StrategyConnector } from './StrategyConnector';
 
 const STEP_NAME = {
@@ -18,11 +16,6 @@ const STEP_NAME = {
 function timeout(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
-
-const addCardData = (card: any) => ({
-  ...card,
-  _card: byName(card.card),
-})
 
 async function play() {
   const dragonlandService = new DragonlandService('http://localhost:3000')
@@ -54,7 +47,7 @@ async function play() {
 
   const strategyConnector = new StrategyConnector(io)
 
-  strategyConnector.connect(new RandomStrategy())
+  strategyConnector.connect(new SimulationStrategy())
 }
 
 play()

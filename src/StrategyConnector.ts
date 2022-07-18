@@ -1,6 +1,6 @@
 import {Socket} from "socket.io-client"
 import { GameState } from "./GameState"
-import {Strategy} from './Strategy'
+import {Strategy} from './strategies/Strategy'
 
 export const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
   let timeout: NodeJS.Timeout
@@ -56,11 +56,9 @@ export class StrategyConnector {
 
   private requestAndSendAction() {
     if (this.strategy && this.gameState && this.playerId &&
-        (this.gameState.playerPriority(this.playerId) || this.gameState.isInPromptState(this.playerId))) {
-      console.log('Requesting action')
+        (this.gameState.playerPriority(this.playerId) || this.gameState.isInPromptState(this.playerId))
+    ) {
       const action = this.strategy.requestAction()
-      console.log('Action received:')
-      console.dir(action)
       this.io.emit('clientAction', action)
     }
   }
