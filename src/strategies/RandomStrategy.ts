@@ -9,7 +9,7 @@ import {
   PROMPT_TYPE_CHOOSE_CARDS,
   TYPE_CREATURE, TYPE_RELIC
 } from "../const";
-import {GameState} from "../GameState";
+import {GameState, SimplifiedCard} from "../GameState";
 import {Strategy} from './Strategy';
 
 export const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
@@ -177,7 +177,10 @@ export class RandomStrategy implements Strategy {
             const myMagi = this.gameState.getMyMagi()
             console.log('myMagi')
             console.dir(myMagi)
-            myMagi._card = byName(myMagi.card)
+            const cardObj = byName(myMagi.card)
+            if (cardObj) { 
+              myMagi._card = cardObj as SimplifiedCard
+            }
             const availableEnergy = myMagi.data.energy
             const playable = this.gameState.getPlayableCards()
               .map(addCardData)
@@ -203,7 +206,7 @@ export class RandomStrategy implements Strategy {
               const randomMy = myCreatures[Math.floor(Math.random() * myCreatures.length)]
               if (enemyCreatures.length) {
                 const randomOpponent = enemyCreatures[Math.floor(Math.random() * enemyCreatures.length)]
-                if (randomMy._card.data.canAttackMagiDirectly && randomMy.data.energy <= opponentMagi.data.energy) {
+                if (randomMy._card?.data.canAttackMagiDirectly && randomMy.data.energy <= opponentMagi.data.energy) {
                   return this.attack(randomMy.id, opponentMagi.id)
                 } else {
                   return this.attack(randomMy.id, randomOpponent.id)

@@ -69,14 +69,16 @@ import {byName} from 'moonlands/dist/cards'
 const nanoid = () => 'new_nanoid'
 const zonesToConsiderForStaticAbilities = new Set(['inPlay', 'opponentInPlay', 'playerActiveMagi', 'opponentActiveMagi'])
 
+export interface SimplifiedCard {
+  name: string,
+  type: typeof TYPE_CREATURE | typeof TYPE_MAGI | typeof TYPE_RELIC | typeof TYPE_SPELL,
+  region: 'regions/naroom',
+  cost: null | number,
+  data: Object,
+}
+
 type Card = {
-  _card: {
-    name: string,
-    type: typeof TYPE_CREATURE | typeof TYPE_MAGI | typeof TYPE_RELIC | typeof TYPE_SPELL,
-    region: 'regions/naroom',
-    cost: null | number,
-    data: Object,
-  },
+  _card: SimplifiedCard,
   card: string,
   id: 'KciCPul2-w2WLERqo-ZFc',
   data: {
@@ -202,7 +204,7 @@ export class GameState {
         ...card,
         _card: byName(card.card),
       }))
-      .filter(card => card._card.type === TYPE_RELIC && card.owner === this.playerId)
+      .filter(card => card._card?.type === TYPE_RELIC && card.owner === this.playerId)
   }
 
   public getMyCreaturesInPlay() {
@@ -211,7 +213,7 @@ export class GameState {
         ...card,
         _card: byName(card.card),
       }))
-      .filter(card => card._card.type === TYPE_CREATURE && card.owner === this.playerId)
+      .filter(card => card._card?.type === TYPE_CREATURE && card.owner === this.playerId)
   }
 
   public getEnemyCreaturesInPlay() {
@@ -220,7 +222,7 @@ export class GameState {
         ...card,
         _card: byName(card.card),
       }))
-      .filter(card => card._card.type === TYPE_CREATURE && card.owner !== this.playerId)
+      .filter(card => card._card?.type === TYPE_CREATURE && card.owner !== this.playerId)
   }
 
   public getMyMagi() {
@@ -231,7 +233,7 @@ export class GameState {
     return this.state.zones.opponentActiveMagi[0]
   }
 
-  private getZoneName = (serverZoneType: string, source: Card) => {
+  private getZoneName = (serverZoneType: string, source: Card): keyof typeof this.state.zones => {
     if (!(serverZoneType in clientZoneNames)) {
       throw new Error(`Unknown zone: ${serverZoneType}`);
     }
@@ -241,7 +243,7 @@ export class GameState {
     }
     const zonePrefix = source.owner === this.playerId ? 'player' : 'opponent';
     const zoneName = clientZoneNames[serverZoneType];
-    return `${zonePrefix}${zoneName}`;
+    return `${zonePrefix}${zoneName}` as keyof typeof this.state.zones;
   }
 
   private reducer(state: StateRepresentation, action: any) {
@@ -410,11 +412,15 @@ export class GameState {
         if (zonesToConsiderForStaticAbilities.has(sourceZone)) {
           // We are removing card with static ability from the play
           staticAbilities = staticAbilities.filter(card => card.id !== action.sourceCard.id);
-        } else if (zonesToConsiderForStaticAbilities.has(destinationZone) && byName(action.destinationCard.card).data.staticAbilities) {
+        } else if (zonesToConsiderForStaticAbilities.has(destinationZone) && byName(action.destinationCard.card)?.data.staticAbilities) {
           staticAbilities.push({
             ...action.destinationCard,
             card: byName(action.destinationCard.card),
           });
+        }
+
+        if (!(state.zones[sourceZone]) || !(destinationZone in state.zones)) {
+          return state
         }
 
         return {
@@ -453,7 +459,7 @@ export class GameState {
       }
       case EFFECT_TYPE_PAYING_ENERGY_FOR_POWER: {
         const targetBaseCard = byName(action.target.card);
-        switch (targetBaseCard.type) {
+        switch (targetBaseCard?.type) {
           case TYPE_CREATURE: {
             // creature pays for the ability
             return state;

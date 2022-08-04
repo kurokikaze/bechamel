@@ -4,7 +4,8 @@
   "description": "Magi-Nation Duel bot",
   "main": "bechamel.js",
   "scripts": {
-    "start": "node --experimental-modules --es-module-specifier-resolution=node ./build/bechamel.js"
+    "start": "node --experimental-modules --es-module-specifier-resolution=node ./build/bechamel.js",
+    "build": "tsc"
   },
   "author": "bolter.fire@gmail.com",
   "license": "MIT",
@@ -16,9 +17,10 @@
     "@types/node": "^18.0.3",
     "@types/node-fetch": "^2.6.2",
     "isomorphic-fetch": "^3.0.0",
-    "moonlands": "https://github.com/kurokikaze/moonlands/archive/refs/tags/v0.8.8.tar.gz",
+    "moonlands": "https://github.com/kurokikaze/moonlands/archive/refs/tags/v0.10.2.tar.gz",
     "nanoid": "^4.0.0",
     "socket.io-client": "^4.5.1",
+    "ts-jest": "^28.0.7",
     "typescript": "^4.7.4"
   }
 }
