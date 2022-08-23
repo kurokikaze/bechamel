@@ -1,4 +1,3 @@
-// import { byName } from 'moonlands/src/cards';
 import {
   ACTION_TIME_NOTIFICATION,
   ACTION_ATTACK,
@@ -40,31 +39,8 @@ import {
   ZONE_TYPE_MAGI_PILE,
   PROMPT_TYPE_SINGLE_CREATURE,
 } from './const'
-// import { nanoid } from 'nanoid'
-import {byName} from 'moonlands/dist/cards'
-
-// const byName = (cardName: string): Card => ({
-//   _card: {
-//     name: cardName,
-//     type: TYPE_CREATURE,
-//     region: 'regions/naroom',
-//     cost: 0,
-//     data: {},
-//   },
-//   card: cardName,
-//   id: 'KciCPul2-w2WLERqo-ZFc',
-//   data: {
-//     energy: 0,
-//     controller: 1,
-//     attacked: 0,
-//     actionsUsed: [],
-//     energyLostThisTurn: 0,
-//     defeatedCreature: false,
-//     hasAttacked: false,
-//     wasAttacked: false,
-//   },
-//   owner: 1
-// })
+import {byName} from 'moonlands/src/cards'
+import {ExpandedClientCard, HiddenCard, SerializedClientState, StateRepresentation} from './types'
 
 const nanoid = () => 'new_nanoid'
 const zonesToConsiderForStaticAbilities = new Set(['inPlay', 'opponentInPlay', 'playerActiveMagi', 'opponentActiveMagi'])
@@ -77,10 +53,9 @@ export interface SimplifiedCard {
   data: Object,
 }
 
-type Card = {
-  _card: SimplifiedCard,
+type ClientCard = {
   card: string,
-  id: 'KciCPul2-w2WLERqo-ZFc',
+  id: string,
   data: {
     energy: number,
     controller: number,
@@ -95,39 +70,23 @@ type Card = {
   owner: number
 }
 
-type StateRepresentation = {
-	zones: {
-		playerHand: Card[],
-		playerDeck: Card[],
-		playerDiscard: Card[],
-		playerActiveMagi: Card[],
-		playerMagiPile: Card[],
-		playerDefeatedMagi: Card[],
-		inPlay: Card[],
-		opponentHand: Card[],
-		opponentDeck: Card[],
-		opponentDiscard: Card[],
-		opponentActiveMagi: Card[],
-		opponentMagiPile: Card[],
-		opponentDefeatedMagi: Card[],
-	},
-	continuousEffects: any[],
-	staticAbilities: any[],
-	turnTimer: boolean,
-	turnSecondsLeft: number | null,
-	gameEnded: boolean,
-	winner: number | null,
-  activePlayer: number,
-  energyPrompt: boolean,
-	prompt: boolean,
-  step: number,
-	promptPlayer: number | null,
-	promptType: null,
-	promptMessage: null,
-	promptParams: {},
-	promptGeneratedBy: null,
-	promptAvailableCards: [],
-};
+type Card = {
+  _card: SimplifiedCard,
+  card: string,
+  id: string,
+  data: {
+    energy: number,
+    controller: number,
+    attacked: number,
+    actionsUsed: string[],
+    energyLostThisTurn: number,
+    defeatedCreature: boolean,
+    hasAttacked: boolean,
+    wasAttacked: boolean,
+    staticAbilities?: string[]
+  },
+  owner: number
+}
 
 export const findInPlay = (state: StateRepresentation, id: string) => {
 	const cardPlayerInPlay = state.zones.inPlay.find(card => card.id === id);
@@ -154,7 +113,18 @@ const clientZoneNames = {
 
 export class GameState {
   playerId: number = 0
-  public constructor(private state: StateRepresentation) {}
+  state: StateRepresentation
+  public constructor(serializedState: SerializedClientState) {
+    this.state = {
+      ...serializedState,
+      continuousEffects: [],
+      staticAbilities: [],
+      energyPrompt: false,
+      turnTimer: false,
+      turnSecondsLeft: 0,
+      promptAvailableCards: [],
+    }
+  }
 
   public setPlayerId(playerId: number) {
     this.playerId = playerId
@@ -177,13 +147,13 @@ export class GameState {
   }
 
   public getPromptType() {
-    this.state.prompt ? this.state.promptType : null
+    return this.state.prompt ? this.state.promptType : null
   }
 
   public getStartingCards(): string[] {
     if (!this.waitingForCardSelection()) { return [] }
 
-    return this.state.promptAvailableCards
+    return this.state.promptParams.availableCards || []
   }
 
   public update(action: any) {
@@ -194,11 +164,11 @@ export class GameState {
     return this.state.step
   }
 
-  public getPlayableCards() {
+  public getPlayableCards(): ClientCard[] {
     return this.state.zones.playerHand
   }
 
-  public getMyRelicsInPlay() {
+  public getMyRelicsInPlay(): ExpandedClientCard[] {
     return this.state.zones.inPlay
       .map(card => ({
         ...card,
@@ -207,7 +177,7 @@ export class GameState {
       .filter(card => card._card?.type === TYPE_RELIC && card.owner === this.playerId)
   }
 
-  public getMyCreaturesInPlay() {
+  public getMyCreaturesInPlay(): ExpandedClientCard[] {
     return this.state.zones.inPlay
       .map(card => ({
         ...card,
@@ -216,7 +186,7 @@ export class GameState {
       .filter(card => card._card?.type === TYPE_CREATURE && card.owner === this.playerId)
   }
 
-  public getEnemyCreaturesInPlay() {
+  public getEnemyCreaturesInPlay(): ExpandedClientCard[] {
     return this.state.zones.inPlay
       .map(card => ({
         ...card,
@@ -225,11 +195,24 @@ export class GameState {
       .filter(card => card._card?.type === TYPE_CREATURE && card.owner !== this.playerId)
   }
 
-  public getMyMagi() {
+  public getEnemyRelicsInPlay(): ExpandedClientCard[] {
+    return this.state.zones.inPlay
+      .map(card => ({
+        ...card,
+        _card: byName(card.card),
+      }))
+      .filter(card => card._card?.type === TYPE_RELIC && card.owner !== this.playerId)
+  }
+
+  public getMyMagi(): ClientCard {
     return this.state.zones.playerActiveMagi[0]
   }
 
-  public getOpponentMagi() {
+  public getMyMagiPile(): ClientCard[] {
+    return this.state.zones.playerMagiPile
+  }
+
+  public getOpponentMagi(): ClientCard {
     return this.state.zones.opponentActiveMagi[0]
   }
 
@@ -246,7 +229,7 @@ export class GameState {
     return `${zonePrefix}${zoneName}` as keyof typeof this.state.zones;
   }
 
-  private reducer(state: StateRepresentation, action: any) {
+  private reducer(state: StateRepresentation, action: any): StateRepresentation {
     switch (action.type) {
       case ACTION_TIME_NOTIFICATION: {
         return {
@@ -266,7 +249,6 @@ export class GameState {
         return {
           ...state,
           step: action.newStep,
-          packs: [],
         };
       }
       case ACTION_POWER: {
@@ -368,9 +350,9 @@ export class GameState {
           prompt: false,
           promptPlayer: null,
           promptType: null,
-          promptParams: null,
+          promptParams: {},
           promptGeneratedBy: null,
-          promptAvailableCards: null,
+          promptAvailableCards: [],
         };
       }
       case ACTION_ATTACK: {
@@ -423,12 +405,14 @@ export class GameState {
           return state
         }
 
+        const sourceZoneContent: (ClientCard | HiddenCard)[] = state.zones[sourceZone]
+
         return {
           ...state,
           staticAbilities,
           zones: {
             ...state.zones,
-            [sourceZone]: state.zones[sourceZone].filter(card => card.id !== action.sourceCard.id),
+            [sourceZone]: sourceZoneContent.filter((card: {id: string}): boolean => card.id !== action.sourceCard.id),
             [destinationZone]: [...state.zones[destinationZone], action.destinationCard],
           },
         };

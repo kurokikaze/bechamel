@@ -1,5 +1,5 @@
 import { byName } from 'moonlands/dist/cards';
-import { State } from 'moonlands/dist/index';
+import { State } from 'moonlands/dist';
 import CardInGame from 'moonlands/dist/classes/CardInGame';
 import Zone from 'moonlands/dist/classes/Zone';
 import { ZONE_TYPE_HAND, ZONE_TYPE_DECK, ZONE_TYPE_DISCARD, ZONE_TYPE_ACTIVE_MAGI, ZONE_TYPE_MAGI_PILE, ZONE_TYPE_DEFEATED_MAGI, ZONE_TYPE_IN_PLAY, TYPE_CREATURE } from "../const";
@@ -84,17 +84,13 @@ export const CARD_SCORE = 0.1;
 export const getStateScore = (state, attacker, opponent) => {
     let myScore = 0;
     let enemyScore = 0;
-    let myCreatures = [];
-    let enemyCreatures = [];
     const creatures = state.getZone(ZONE_TYPE_IN_PLAY).cards.filter((card) => card.card.type === TYPE_CREATURE);
     creatures.forEach((creature) => {
         if (creature.owner === attacker) {
             myScore += creature.data.energy + CARD_SCORE;
-            myCreatures.push(`${creature.card.name}: ${creature.data.energy}`);
         }
         else {
             enemyScore += creature.data.energy + CARD_SCORE;
-            enemyCreatures.push(`${creature.card.name}: ${creature.data.energy}`);
         }
     });
     const myMagi = state.getZone(ZONE_TYPE_ACTIVE_MAGI, attacker).card;

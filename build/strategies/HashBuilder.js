@@ -4,6 +4,7 @@ export class HashBuilder {
         this.ids = new Map();
     }
     makeHash(sim) {
+        var _a;
         const battlefieldCards = sim.getZone(ZONE_TYPE_IN_PLAY).cards;
         let cardHashes = [];
         battlefieldCards.forEach(card => {
@@ -26,7 +27,7 @@ export class HashBuilder {
         const ourMagiHash = ourMagi ? `@${ourMagi.data.energy}[${ourMagi.data.actionsUsed.map((action) => this.convertHash(action)).join(',')}]` : 'X';
         const enemyMagi = sim.getZone(ZONE_TYPE_ACTIVE_MAGI, sim.players[1]).card;
         const enemyMagiHash = enemyMagi ? `@${enemyMagi.data.energy}` : 'X';
-        return '{' + handHashes.join(',') + '}' + ourMagiHash + '|' + cardHashes.join('|') + '|' + enemyMagiHash + (sim.state.prompt ? '?' + this.convertHash(sim.state.promptGeneratedBy || '') : '');
+        return (sim.state.activePlayer === sim.players[0] ? '*' : 'v') + ((_a = sim.state.step) === null || _a === void 0 ? void 0 : _a.toString()) + '{' + handHashes.join(',') + '}' + ourMagiHash + '|' + cardHashes.join('|') + '|' + enemyMagiHash + (sim.state.prompt ? '?' + this.convertHash(sim.state.promptGeneratedBy || '') : '');
     }
     convertHash(hash) {
         if (this.ids.has(hash)) {

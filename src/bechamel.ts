@@ -1,6 +1,6 @@
 import {DragonlandService} from './DragonlandService'
 import { GameConnector } from './GameConnector'
-import { RandomStrategy } from './strategies/RandomStrategy';
+// import { RandomStrategy } from './strategies/RandomStrategy';
 import { SimulationStrategy } from './strategies/SimulationStrategy';
 import { StrategyConnector } from './StrategyConnector';
 
@@ -27,7 +27,7 @@ async function play() {
     console.log("No challenges")
   }
   console.log(`Ready to accept challenge ${challenges[0].deckId}:${challenges[0].user}`)
-  const gameHash = await dragonlandService.acceptChallenge(challenges[0].user, RandomStrategy.deckId)
+  const gameHash = await dragonlandService.acceptChallenge(challenges[0].user, SimulationStrategy.deckId)
   console.log(`Started game ${gameHash}`)
 
   if (!gameHash) {

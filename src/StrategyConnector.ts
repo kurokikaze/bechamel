@@ -1,6 +1,7 @@
 import {Socket} from "socket.io-client"
 import { GameState } from "./GameState"
 import {Strategy} from './strategies/Strategy'
+import { SerializedClientState } from "./types"
 
 export const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
   let timeout: NodeJS.Timeout
@@ -25,7 +26,7 @@ export class StrategyConnector {
     this.strategy = strategy
     const dRequestAction = debounce(this.requestAndSendAction.bind(this), 200)
 
-    this.io.on('gameData', (data: {playerId: number, state: any}) => {
+    this.io.on('gameData', (data: {playerId: number, state: SerializedClientState}) => {
       this.playerId = data.playerId
       this.gameState = new GameState(data.state)
       this.gameState.setPlayerId(data.playerId)

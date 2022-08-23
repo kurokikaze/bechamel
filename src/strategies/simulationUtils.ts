@@ -1,9 +1,10 @@
-import {byName} from 'moonlands/dist/cards'
-import {State} from 'moonlands/dist/index'
-import CardInGame from 'moonlands/dist/classes/CardInGame'
-import Zone from 'moonlands/dist/classes/Zone'
+import {byName} from 'moonlands/src/cards'
+import {State} from 'moonlands/src'
+import CardInGame from 'moonlands/src/classes/CardInGame'
+import Zone from 'moonlands/src/classes/Zone'
 
 import { ZONE_TYPE_HAND, ZONE_TYPE_DECK, ZONE_TYPE_DISCARD, ZONE_TYPE_ACTIVE_MAGI, ZONE_TYPE_MAGI_PILE, ZONE_TYPE_DEFEATED_MAGI, ZONE_TYPE_IN_PLAY, TYPE_CREATURE } from "../const";
+import {StateShape} from 'moonlands/dist';
 
 export const booleanGuard = Boolean as any as <T>(x: T | false | undefined | null | "" | 0) => x is T;
 
@@ -23,7 +24,7 @@ export const createZones = (player1: number, player2: number, creatures: CardInG
 	new Zone('In play', ZONE_TYPE_IN_PLAY, null).add(creatures),
 ]
 
-const defaultState = {
+const defaultState: StateShape = {
 	actions: [],
 	savedActions: [],
 	delayedTriggers: [],
@@ -115,16 +116,12 @@ export const getStateScore = (state: State, attacker: number, opponent: number):
   let myScore = 0
   let enemyScore = 0
 
-  let myCreatures: string[] = []
-  let enemyCreatures: string[] = []
   const creatures = state.getZone(ZONE_TYPE_IN_PLAY).cards.filter((card: CardInGame) => card.card.type === TYPE_CREATURE)
   creatures.forEach((creature: CardInGame) => {
     if (creature.owner === attacker) {
       myScore += creature.data.energy + CARD_SCORE
-      myCreatures.push(`${creature.card.name}: ${creature.data.energy}`)
     } else {
       enemyScore += creature.data.energy + CARD_SCORE
-      enemyCreatures.push(`${creature.card.name}: ${creature.data.energy}`)
     }
   })
 

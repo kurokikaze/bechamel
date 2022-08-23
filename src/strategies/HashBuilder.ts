@@ -29,7 +29,7 @@ export class HashBuilder {
     const enemyMagi = sim.getZone(ZONE_TYPE_ACTIVE_MAGI, sim.players[1]).card
     const enemyMagiHash = enemyMagi ? `@${enemyMagi.data.energy}` : 'X'
 
-    return '{' + handHashes.join(',') + '}' + ourMagiHash + '|' + cardHashes.join('|') + '|' + enemyMagiHash + (sim.state.prompt ? '?'+ this.convertHash(sim.state.promptGeneratedBy || '') : '')
+    return (sim.state.activePlayer === sim.players[0] ? '*' : 'v') + sim.state.step?.toString() + '{' + handHashes.join(',') + '}' + ourMagiHash + '|' + cardHashes.join('|') + '|' + enemyMagiHash + (sim.state.prompt ? '?'+ this.convertHash(sim.state.promptGeneratedBy || '') : '')
   }
 
   private convertHash(hash: string): number {

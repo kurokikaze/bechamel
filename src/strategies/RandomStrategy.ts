@@ -135,7 +135,7 @@ export class RandomStrategy implements Strategy {
             return this.pass()
           }
           case STEP_NAME.PRS2: {
-            const relics = this.gameState.getMyRelicsInPlay().map(card => card._card.name)
+            const relics = this.gameState.getMyRelicsInPlay()
             const enemyCreatures = this.gameState.getEnemyCreaturesInPlay()
 
             if (relics.some(card => card.card === 'Siphon Stone') && enemyCreatures.some(card => card.data.energy === 1)) {
@@ -178,14 +178,11 @@ export class RandomStrategy implements Strategy {
             console.log('myMagi')
             console.dir(myMagi)
             const cardObj = byName(myMagi.card)
-            if (cardObj) { 
-              myMagi._card = cardObj as SimplifiedCard
-            }
             const availableEnergy = myMagi.data.energy
             const playable = this.gameState.getPlayableCards()
               .map(addCardData)
               .filter(card => {
-                const regionTax = (myMagi._card.region === card._card.region) ? 0 : 1
+                const regionTax = (cardObj.region === card._card.region) ? 0 : 1
                 return card._card.type === TYPE_CREATURE && card._card.cost && (card._card.cost + regionTax) <= availableEnergy
               })
             if (playable.length) {
@@ -197,7 +194,7 @@ export class RandomStrategy implements Strategy {
           case STEP_NAME.ATTACK: {
             const myMagi = this.gameState.getMyMagi()
             const myCreatures = this.gameState.getMyCreaturesInPlay().filter(creature => {
-              const numberOfAttacks = myMagi.card === 'Yaki' ? 2 : (creature._card.data.numberOfAttacks || 1)
+              const numberOfAttacks = myMagi.card === 'Yaki' ? 2 : (creature._card.data.attacksPerTurn || 1)
               return creature.data.attacked < numberOfAttacks
             })
             const enemyCreatures = this.gameState.getEnemyCreaturesInPlay()
