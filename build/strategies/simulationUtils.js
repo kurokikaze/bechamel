@@ -1,7 +1,7 @@
-import { byName } from 'moonlands/dist/cards';
-import { State } from 'moonlands/dist';
-import CardInGame from 'moonlands/dist/classes/CardInGame';
-import Zone from 'moonlands/dist/classes/Zone';
+import { byName } from 'moonlands/src/cards';
+import { State } from 'moonlands/src';
+import CardInGame from 'moonlands/src/classes/CardInGame';
+import Zone from 'moonlands/src/classes/Zone';
 import { ZONE_TYPE_HAND, ZONE_TYPE_DECK, ZONE_TYPE_DISCARD, ZONE_TYPE_ACTIVE_MAGI, ZONE_TYPE_MAGI_PILE, ZONE_TYPE_DEFEATED_MAGI, ZONE_TYPE_IN_PLAY, TYPE_CREATURE } from "../const";
 export const booleanGuard = Boolean;
 export const createZones = (player1, player2, creatures = [], activeMagi = []) => [

@@ -3,7 +3,7 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   transform: {
-    '^tests/.+ts$': 'ts-jest',
+    '^src/tests/.+ts$': 'ts-jest',
     "^.+\\.js$": "ts-jest",
   },
   transformIgnorePatterns: [

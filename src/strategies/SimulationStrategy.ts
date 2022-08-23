@@ -248,7 +248,9 @@ export class SimulationStrategy implements Strategy {
         }
         const score = getStateScore(workEntity.sim, this.playerId, opponentId)
         const hash = this.hashBuilder.makeHash(workEntity.sim)
-        this.graph = this.graph + `  "${workEntity.previousHash}" -> "${hash}" [label="${this.actionToLabel(workEntity.action)}"]\n`
+        try {
+          this.graph = this.graph + `  "${workEntity.previousHash}" -> "${hash}" [label="${this.actionToLabel(workEntity.action)}"]\n`
+        } catch (_e) {}
         if (hashes.has(hash)) {
           continue
         }

@@ -109,7 +109,6 @@ export class ActionExtractor {
       }
       case STEP_NAME.ATTACK: {
         const attackPatterns = ActionExtractor.getAllAttackPatterns(sim, playerId, opponentId)
-        console.dir(attackPatterns)
 
         const workEntities: SimulationEntity[] = [ActionExtractor.getPassAction(sim, playerId, actionLog, previousHash)]
         attackPatterns.forEach(pattern => {
@@ -373,8 +372,6 @@ export class ActionExtractor {
   public static getAllAttackPatterns(sim: State, attacker: number, opponent: number): AttackPattern[] {
     const creatures = sim.getZone(ZONE_TYPE_IN_PLAY).cards.filter((card: CardInGame) => card.card.type === TYPE_CREATURE)
     const attackers = creatures.filter((card: CardInGame) => card.owner === attacker)
-    console.dir(creatures)
-    console.log(`Attacker: ${attacker}, defender: ${opponent}`)
     const defenders = creatures.filter((card: CardInGame) => card.owner !== attacker)
     const enemyMagi = sim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponent).cards[0]
   

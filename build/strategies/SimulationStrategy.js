@@ -1,5 +1,5 @@
-import { byName } from 'moonlands/dist/cards';
-import CardInGame from 'moonlands/dist/classes/CardInGame';
+import { byName } from 'moonlands/src/cards';
+import CardInGame from 'moonlands/src/classes/CardInGame';
 import { ZONE_TYPE_HAND, ACTION_ATTACK, ACTION_PASS, ACTION_PLAY, ACTION_POWER, ACTION_RESOLVE_PROMPT, PROMPT_TYPE_CHOOSE_CARDS, TYPE_CREATURE, TYPE_RELIC, ZONE_TYPE_MAGI_PILE, } from "../const";
 import { createState, getStateScore } from './simulationUtils';
 import { HashBuilder } from './HashBuilder';
@@ -190,7 +190,10 @@ export class SimulationStrategy {
                 }
                 const score = getStateScore(workEntity.sim, this.playerId, opponentId);
                 const hash = this.hashBuilder.makeHash(workEntity.sim);
-                this.graph = this.graph + `  "${workEntity.previousHash}" -> "${hash}" [label="${this.actionToLabel(workEntity.action)}"]\n`;
+                try {
+                    this.graph = this.graph + `  "${workEntity.previousHash}" -> "${hash}" [label="${this.actionToLabel(workEntity.action)}"]\n`;
+                }
+                catch (_e) { }
                 if (hashes.has(hash)) {
                     continue;
                 }
