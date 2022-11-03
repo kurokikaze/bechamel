@@ -1,5 +1,5 @@
-import { byName } from 'moonlands/src/cards';
-import CardInGame from 'moonlands/src/classes/CardInGame';
+import { byName } from 'moonlands/dist/cards';
+import CardInGame from 'moonlands/dist/classes/CardInGame';
 import { ZONE_TYPE_HAND, ACTION_ATTACK, ACTION_PASS, ACTION_PLAY, ACTION_POWER, ACTION_RESOLVE_PROMPT, PROMPT_TYPE_CHOOSE_CARDS, TYPE_CREATURE, TYPE_RELIC, ZONE_TYPE_MAGI_PILE, } from "../const";
 import { createState, getStateScore } from './simulationUtils';
 import { HashBuilder } from './HashBuilder';
@@ -39,8 +39,14 @@ export class SimulationStrategy {
             }
         };
     }
-    attack(from, to) {
-        return {
+    attack(from, to, add) {
+        return add ? {
+            type: ACTION_ATTACK,
+            source: from,
+            additionalAttackers: [add],
+            target: to,
+            player: this.playerId,
+        } : {
             type: ACTION_ATTACK,
             source: from,
             target: to,
@@ -74,6 +80,7 @@ export class SimulationStrategy {
         };
     }
     simulationActionToClientAction(simAction) {
+        var _a;
         switch (simAction.type) {
             case ACTION_PLAY: {
                 return this.play(simAction.payload.card.id);
@@ -82,7 +89,8 @@ export class SimulationStrategy {
                 return this.power(simAction.source.id, simAction.power.name);
             }
             case ACTION_ATTACK: {
-                return this.attack(simAction.source.id, simAction.target.id);
+                const add = simAction.additionalAttackers ? (_a = simAction.additionalAttackers[0]) === null || _a === void 0 ? void 0 : _a.id : '';
+                return this.attack(simAction.source.id, simAction.target.id, add);
             }
             case ACTION_RESOLVE_PROMPT: {
                 if (simAction.target) {
@@ -91,7 +99,7 @@ export class SimulationStrategy {
                 if (simAction.number) {
                     return this.resolveNumberPrompt(simAction.number);
                 }
-                console.log('No transformer for sim action');
+                console.log('No transformer for ACTION_RESOLVE_PROMPT action');
                 console.dir(simAction);
                 break;
             }
@@ -179,7 +187,7 @@ export class SimulationStrategy {
         while (simulationQueue.length && counter <= failsafe) {
             counter += 1;
             const workEntity = simulationQueue.shift();
-            if (workEntity) {
+            if (workEntity && workEntity.action) {
                 try {
                     workEntity.sim.update(workEntity.action);
                 }
@@ -190,10 +198,9 @@ export class SimulationStrategy {
                 }
                 const score = getStateScore(workEntity.sim, this.playerId, opponentId);
                 const hash = this.hashBuilder.makeHash(workEntity.sim);
-                try {
-                    this.graph = this.graph + `  "${workEntity.previousHash}" -> "${hash}" [label="${this.actionToLabel(workEntity.action)}"]\n`;
-                }
-                catch (_e) { }
+                // try {
+                //   this.graph = this.graph + `  "${workEntity.previousHash}" -> "${hash}" [label="${this.actionToLabel(workEntity.action)}"]\n`
+                // } catch (_e) {}
                 if (hashes.has(hash)) {
                     continue;
                 }
@@ -203,7 +210,8 @@ export class SimulationStrategy {
                     hash,
                     parentHash: hash,
                     score,
-                    actionLog: workEntity.actionLog
+                    actionLog: workEntity.actionLog,
+                    isPrompt: Boolean(workEntity.sim.state.prompt),
                 });
                 simulationQueue.push(...ActionExtractor.extractActions(workEntity.sim, this.playerId, opponentId, workEntity.actionLog, hash));
             }
@@ -213,7 +221,7 @@ export class SimulationStrategy {
             action: []
         };
         this.leaves.forEach((value) => {
-            if ((value.score > bestAction.score) || (value.score == bestAction.score && value.actionLog.length < bestAction.action.length)) {
+            if (!value.isPrompt && (value.score > bestAction.score) || (value.score == bestAction.score && value.actionLog.length < bestAction.action.length)) {
                 bestAction.score = value.score;
                 bestAction.action = value.actionLog;
             }
@@ -330,8 +338,8 @@ export class SimulationStrategy {
                             if (bestAction.type === ACTION_ATTACK) {
                                 return this.simulationActionToClientAction(bestAction);
                             }
-                            return this.pass();
                         }
+                        return this.pass();
                     }
                     default:
                         return this.pass();
@@ -341,4 +349,5 @@ export class SimulationStrategy {
     }
 }
 // public static deckId = '62ed47ae99dd0db04e9f657b' // Online deck
-SimulationStrategy.deckId = '5f60e45e11283f7c98d9259b'; // Local deck
+// public static deckId = '5f60e45e11283f7c98d9259b' // Local deck (Naroom)
+SimulationStrategy.deckId = '6305ec3aa14ce19348dfd7f9'; // Local deck (Underneath/Naroom)

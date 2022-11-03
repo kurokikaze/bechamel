@@ -39,9 +39,9 @@ export class StrategyConnector {
     })
 
     this.io.on('action', action => {
-      if (this.gameState && this.playerId) {
+      if (this.gameState && this.playerId && action) {
         try {
-        this.gameState.update(action)
+          this.gameState.update(action)
         } catch(e: any) {
           console.log('Error applying the action')
           console.dir(action)
@@ -60,7 +60,9 @@ export class StrategyConnector {
         (this.gameState.playerPriority(this.playerId) || this.gameState.isInPromptState(this.playerId))
     ) {
       const action = this.strategy.requestAction()
-      this.io.emit('clientAction', action)
+      if (action) {
+        this.io.emit('clientAction', action)
+      }
     }
   }
 }

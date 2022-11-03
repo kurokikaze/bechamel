@@ -133,6 +133,13 @@ export const getStateScore = (state: State, attacker: number, opponent: number):
   if (enemyMagi) {
     enemyScore += enemyMagi.data.energy
   }
+  if (state.hasWinner) {
+    if (state.winner === opponent) {
+      enemyScore += 1000;
+    } else {
+      myScore += 1000;
+    }
+  }
   return myScore - enemyScore
 }
 

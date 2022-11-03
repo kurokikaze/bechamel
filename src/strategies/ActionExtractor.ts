@@ -14,7 +14,9 @@ const STEP_NAME = {
 }
 
 type AttackPattern = {
-  from: string, to: string,
+  from: string, 
+  add?: string,
+  to: string,
 }
 
 export class ActionExtractor {
@@ -116,8 +118,16 @@ export class ActionExtractor {
           const source = innerSim.getZone(ZONE_TYPE_IN_PLAY).byId(pattern.from)
           const target = innerSim.getZone(ZONE_TYPE_IN_PLAY).byId(pattern.to) || innerSim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponentId).byId(pattern.to)
 
+          const additionalAttackers = pattern.add ? [innerSim.getZone(ZONE_TYPE_IN_PLAY).byId(pattern.add)] : []
           if (source && target) {
-            const action = {
+            const action = additionalAttackers ? {
+              type: ACTION_ATTACK,
+              source,
+              additionalAttackers,
+              target,
+              player: playerId,
+            } : 
+            {
               type: ACTION_ATTACK,
               source,
               target,
@@ -178,7 +188,7 @@ export class ActionExtractor {
     return {
       sim: innerSim,
       action: passAction,
-      actionLog: [passAction, ...actionLog],
+      actionLog: [...actionLog, passAction],
       previousHash,
     }
   }
@@ -376,6 +386,7 @@ export class ActionExtractor {
     const enemyMagi = sim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponent).cards[0]
   
     const result: AttackPattern[] = []
+    const packHunters = attackers.filter(card => card.card.data.canPackHunt)
     for (let attacker of attackers) {
       const numberOfAttacks = sim.modifyByStaticAbilities(attacker, PROPERTY_ATTACKS_PER_TURN)
       if (attacker.data.attacked < numberOfAttacks) {
@@ -384,6 +395,11 @@ export class ActionExtractor {
         }
         for (let defender of defenders) {
           result.push({from: attacker.id, to: defender.id})
+          for (let packHunter of packHunters) {
+            if (packHunter.id !== attacker.id) {
+              result.push({from: attacker.id, add: packHunter.id, to: defender.id})
+            }
+          }
         }
       }
     }

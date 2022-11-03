@@ -1,4 +1,4 @@
-// import { RestrictionObjectType } from 'moonlands/src/types';
+// import { RestrictionObjectType } from 'moonlands/dist/types';
 import { ACTION_ATTACK, PROPERTY_ATTACKS_PER_TURN, ACTION_PASS, TYPE_CREATURE, ZONE_TYPE_ACTIVE_MAGI, ZONE_TYPE_IN_PLAY, PROMPT_TYPE_OWN_SINGLE_CREATURE, ACTION_RESOLVE_PROMPT, PROMPT_TYPE_MAY_ABILITY, PROMPT_TYPE_NUMBER, PROMPT_TYPE_SINGLE_CREATURE, PROMPT_TYPE_SINGLE_MAGI, ACTION_POWER, ZONE_TYPE_HAND, TYPE_SPELL, ACTION_PLAY, REGION_UNIVERSAL, PROMPT_TYPE_SINGLE_CREATURE_FILTERED } from '../const';
 const STEP_NAME = {
     ENERGIZE: 0,
@@ -95,19 +95,26 @@ export class ActionExtractor {
             }
             case STEP_NAME.ATTACK: {
                 const attackPatterns = ActionExtractor.getAllAttackPatterns(sim, playerId, opponentId);
-                console.dir(attackPatterns);
                 const workEntities = [ActionExtractor.getPassAction(sim, playerId, actionLog, previousHash)];
                 attackPatterns.forEach(pattern => {
                     const innerSim = sim.clone();
                     const source = innerSim.getZone(ZONE_TYPE_IN_PLAY).byId(pattern.from);
                     const target = innerSim.getZone(ZONE_TYPE_IN_PLAY).byId(pattern.to) || innerSim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponentId).byId(pattern.to);
+                    const additionalAttackers = pattern.add ? [innerSim.getZone(ZONE_TYPE_IN_PLAY).byId(pattern.add)] : [];
                     if (source && target) {
-                        const action = {
+                        const action = additionalAttackers ? {
                             type: ACTION_ATTACK,
                             source,
+                            additionalAttackers,
                             target,
                             player: playerId,
-                        };
+                        } :
+                            {
+                                type: ACTION_ATTACK,
+                                source,
+                                target,
+                                player: playerId,
+                            };
                         workEntities.push({
                             sim: innerSim,
                             action,
@@ -161,7 +168,7 @@ export class ActionExtractor {
         return {
             sim: innerSim,
             action: passAction,
-            actionLog: [passAction, ...actionLog],
+            actionLog: [...actionLog, passAction],
             previousHash,
         };
     }
@@ -339,11 +346,10 @@ export class ActionExtractor {
     static getAllAttackPatterns(sim, attacker, opponent) {
         const creatures = sim.getZone(ZONE_TYPE_IN_PLAY).cards.filter((card) => card.card.type === TYPE_CREATURE);
         const attackers = creatures.filter((card) => card.owner === attacker);
-        console.dir(creatures);
-        console.log(`Attacker: ${attacker}, defender: ${opponent}`);
         const defenders = creatures.filter((card) => card.owner !== attacker);
         const enemyMagi = sim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponent).cards[0];
         const result = [];
+        const packHunters = attackers.filter(card => card.card.data.canPackHunt);
         for (let attacker of attackers) {
             const numberOfAttacks = sim.modifyByStaticAbilities(attacker, PROPERTY_ATTACKS_PER_TURN);
             if (attacker.data.attacked < numberOfAttacks) {
@@ -352,6 +358,11 @@ export class ActionExtractor {
                 }
                 for (let defender of defenders) {
                     result.push({ from: attacker.id, to: defender.id });
+                    for (let packHunter of packHunters) {
+                        if (packHunter.id !== attacker.id) {
+                            result.push({ from: attacker.id, add: packHunter.id, to: defender.id });
+                        }
+                    }
                 }
             }
         }
