@@ -283,7 +283,7 @@ export class SimulationStrategy {
                         outerSim.getZone(ZONE_TYPE_HAND, this.playerId).add(playableEnrichedCards.map(card => {
                             const gameCard = new CardInGame(byName(card.card), this.playerId);
                             gameCard.id = card.id;
-                            return card;
+                            return gameCard;
                         }));
                         outerSim.getZone(ZONE_TYPE_MAGI_PILE, this.playerId).add(myMagiPile.map(magi => {
                             const card = new CardInGame(byName(magi.card), this.playerId);
@@ -350,4 +350,4 @@ export class SimulationStrategy {
 }
 // public static deckId = '62ed47ae99dd0db04e9f657b' // Online deck
 // public static deckId = '5f60e45e11283f7c98d9259b' // Local deck (Naroom)
-SimulationStrategy.deckId = '6305ec3aa14ce19348dfd7f9'; // Local deck (Underneath/Naroom)
+SimulationStrategy.deckId = '5f60e45e11283f7c98d9259c'; // Local deck (Arderial)

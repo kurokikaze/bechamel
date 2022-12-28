@@ -1,7 +1,7 @@
 // globals describe, it
-import { State } from 'moonlands/src';
-import { byName } from 'moonlands/src/cards';
-import CardInGame from 'moonlands/src/classes/CardInGame';
+import { State } from 'moonlands/dist';
+import { byName } from 'moonlands/dist/cards';
+import CardInGame from 'moonlands/dist/classes/CardInGame';
 import { SimulationStrategy } from '../strategies/SimulationStrategy';
 import { GameState } from '../GameState';
 import { createZones } from '../strategies/simulationUtils';

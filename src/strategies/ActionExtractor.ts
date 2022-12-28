@@ -1,7 +1,7 @@
 import CardInGame from 'moonlands/src/classes/CardInGame';
 import {State} from 'moonlands/src/index'
 // import { RestrictionObjectType } from 'moonlands/src/types';
-import {ACTION_ATTACK, PROPERTY_ATTACKS_PER_TURN, ACTION_PASS, TYPE_CREATURE, ZONE_TYPE_ACTIVE_MAGI, ZONE_TYPE_IN_PLAY, PROMPT_TYPE_OWN_SINGLE_CREATURE, ACTION_RESOLVE_PROMPT, PROMPT_TYPE_MAY_ABILITY, PROMPT_TYPE_NUMBER, PROMPT_TYPE_SINGLE_CREATURE, PROMPT_TYPE_SINGLE_MAGI, ACTION_POWER, ZONE_TYPE_HAND, TYPE_SPELL, ACTION_PLAY, REGION_UNDERNEATH, REGION_UNIVERSAL, PROMPT_TYPE_SINGLE_CREATURE_FILTERED} from '../const';
+import {ACTION_ATTACK, PROPERTY_ATTACKS_PER_TURN, ACTION_PASS, TYPE_CREATURE, ZONE_TYPE_ACTIVE_MAGI, ZONE_TYPE_IN_PLAY, PROMPT_TYPE_OWN_SINGLE_CREATURE, ACTION_RESOLVE_PROMPT, PROMPT_TYPE_MAY_ABILITY, PROMPT_TYPE_NUMBER, PROMPT_TYPE_SINGLE_CREATURE, PROMPT_TYPE_SINGLE_MAGI, ACTION_POWER, ZONE_TYPE_HAND, TYPE_SPELL, ACTION_PLAY, REGION_UNDERNEATH, REGION_UNIVERSAL, PROMPT_TYPE_SINGLE_CREATURE_FILTERED, PROMPT_TYPE_SINGLE_CREATURE_OR_MAGI} from '../const';
 import {PlayerActionType, SimulationEntity} from '../types';
 
 const STEP_NAME = {
@@ -68,15 +68,38 @@ export class ActionExtractor {
           }
         })
 
-        if (magiCard && magiCard.card.data.powers && magiCard.card.data.powers.length) {
-          magiCard.card.data.powers.forEach((power: Record<string, any>) => {
-            if (!magiCard.data.actionsUsed.includes(power.name) && power.cost <= magiCard.data.energy) {
-              const innerSim = sim.clone()
+        if (magiCard) {
+          if (magiCard.card.data.powers && magiCard.card.data.powers.length) {
+            magiCard.card.data.powers.forEach((power: Record<string, any>) => {
+              if (!magiCard.data.actionsUsed.includes(power.name) && power.cost <= magiCard.data.energy) {
+                const innerSim = sim.clone()
+                const action = {
+                  type: ACTION_POWER,
+                  source: innerSim.getZone(ZONE_TYPE_ACTIVE_MAGI, playerId).card,
+                  power,
+                  player: playerId,
+                }
+                simulationQueue.push({
+                  sim: innerSim,
+                  action,
+                  actionLog: [...actionLog, action],
+                  previousHash,
+                })
+              }
+            })
+          }
+
+          const playableSpells = sim.getZone(ZONE_TYPE_HAND, playerId).cards.filter(card => card.card.type === TYPE_SPELL && card.card.cost <= magiCard.data.energy)
+          playableSpells.forEach(spell => {
+            const innerSim = sim.clone()
+            const card = innerSim.getZone(ZONE_TYPE_HAND, playerId).byId(spell.id)
+            if (card && spell.card.cost <= magiCard.data.energy) {
               const action = {
-                type: ACTION_POWER,
-                source: innerSim.getZone(ZONE_TYPE_ACTIVE_MAGI, playerId).card,
-                power,
-                player: playerId,
+                type: ACTION_PLAY,
+                payload: {
+                  card,
+                  player: playerId,
+                }
               }
               simulationQueue.push({
                 sim: innerSim,
@@ -87,26 +110,6 @@ export class ActionExtractor {
             }
           })
         }
-        const playableSpells = sim.getZone(ZONE_TYPE_HAND, playerId).cards.filter(card => card.card.type === TYPE_SPELL)
-        playableSpells.forEach(spell => {
-          const innerSim = sim.clone()
-          const card = innerSim.getZone(ZONE_TYPE_HAND, playerId).byId(spell.id)
-          if (card && spell.card.cost <= magiCard.data.energy) {
-            const action = {
-              type: ACTION_PLAY,
-              payload: {
-                card,
-                player: playerId,
-              }
-            }
-            simulationQueue.push({
-              sim: innerSim,
-              action,
-              actionLog: [...actionLog, action],
-              previousHash,
-            })
-          }
-        })
         return simulationQueue
       }
       case STEP_NAME.ATTACK: {
@@ -369,6 +372,70 @@ export class ActionExtractor {
             }
           )
         }
+
+        return simulationQueue
+      }
+      case PROMPT_TYPE_SINGLE_CREATURE_OR_MAGI: {
+        const myMagi: CardInGame | null = sim.getZone(ZONE_TYPE_ACTIVE_MAGI, playerId).card
+        const simulationQueue: SimulationEntity[] = []
+        if (myMagi) {
+          const innerSim = sim.clone()
+          const action = {
+            type: ACTION_RESOLVE_PROMPT,
+            promptType: PROMPT_TYPE_SINGLE_MAGI,
+            target: innerSim.getZone(ZONE_TYPE_ACTIVE_MAGI, playerId).card,
+            generatedBy: innerSim.state.promptGeneratedBy,
+            playerId: innerSim.state.promptPlayer,
+          }
+          simulationQueue.push(
+            {
+              sim: innerSim,
+              action,
+              actionLog: [...actionLog, action],
+              previousHash,
+            }
+          )
+        }
+        const opponentMagi: CardInGame | null = sim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponentId).card
+        if (opponentMagi) {
+          const innerSim = sim.clone()
+          const action = {
+            type: ACTION_RESOLVE_PROMPT,
+            promptType: PROMPT_TYPE_SINGLE_MAGI,
+            target: innerSim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponentId).card,
+            generatedBy: innerSim.state.promptGeneratedBy,
+            playerId: innerSim.state.promptPlayer,
+          }
+          simulationQueue.push(
+            {
+              sim: innerSim,
+              action,
+              actionLog: [...actionLog, action],
+              previousHash,
+            }
+          )
+        }
+        const allCreatures: CardInGame[] = sim.getZone(ZONE_TYPE_IN_PLAY).cards
+          .filter((card: CardInGame) => card.card.type === TYPE_CREATURE)
+
+        allCreatures.forEach(creature => {
+          const innerSim = sim.clone()
+          const action = {
+            type: ACTION_RESOLVE_PROMPT,
+            promptType: PROMPT_TYPE_OWN_SINGLE_CREATURE,
+            target: innerSim.getZone(ZONE_TYPE_IN_PLAY).byId(creature.id),
+            generatedBy: innerSim.state.promptGeneratedBy,
+            playerId: innerSim.state.promptPlayer,
+          }
+          simulationQueue.push(
+            {
+              sim: innerSim,
+              action,
+              actionLog: [...actionLog, action],
+              previousHash,
+            }
+          )
+        })
 
         return simulationQueue
       }
