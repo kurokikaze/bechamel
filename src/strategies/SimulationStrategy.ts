@@ -118,19 +118,19 @@ export class SimulationStrategy implements Strategy {
     }
   }
 
-  private resolveTargetPrompt(target: string) {
+  private resolveTargetPrompt(target: string, type?: string) {
     return {
       type: ACTION_RESOLVE_PROMPT,
-      promptType: this.gameState?.getPromptType(),
+      promptType: type || this.gameState?.getPromptType(),
       target,
       player: this.playerId,
     }
   }
 
-  private resolveNumberPrompt(number: number) {
+  private resolveNumberPrompt(number: number, type?: string) {
     return {
       type: ACTION_RESOLVE_PROMPT,
-      promptType: this.gameState?.getPromptType(),
+      promptType: type || this.gameState?.getPromptType(),
       number,
       player: this.playerId,
     }
@@ -150,10 +150,10 @@ export class SimulationStrategy implements Strategy {
       }
       case ACTION_RESOLVE_PROMPT: {
         if (simAction.target) {
-          return this.resolveTargetPrompt(simAction.target.id)
+          return this.resolveTargetPrompt(simAction.target.id, simAction.promptType)
         }
         if (simAction.number) {
-          return this.resolveNumberPrompt(simAction.number)
+          return this.resolveNumberPrompt(simAction.number, simAction.promptType)
         }
         console.log('No transformer for ACTION_RESOLVE_PROMPT action')
         console.dir(simAction)
@@ -210,6 +210,8 @@ export class SimulationStrategy implements Strategy {
     }
     console.log(`Done ${counter} attack simulations`)
     console.log(`Best found score is ${bestAction.score} (initial is ${initialScore})`)
+    console.log('Actions corresponding to the score: ')
+    console.log(JSON.stringify(bestAction.action))
     return bestAction.action[0]
   }
 
@@ -302,7 +304,14 @@ export class SimulationStrategy implements Strategy {
 
   public requestAction() {
     if (this.actionsOnHold.length) {
-      return this.actionsOnHold.shift()
+      const action = this.actionsOnHold.shift()
+      console.log('Sending action from hold:')
+      console.dir(action)
+      // If we are passing at the creatures step, clear the actions on hold
+      if (action.type === ACTION_PASS && this.gameState.getStep() === STEP_NAME.CREATURES) {
+        this.actionsOnHold = []
+      }
+      return action
     }
 
     if (this.gameState && this.playerId) {
@@ -372,15 +381,21 @@ export class SimulationStrategy implements Strategy {
             if (finalHash !== hash) {
               console.log(`Change leak! hashes mismatch: ${hash} => ${finalHash}`)
             }
-            console.log(`Best PRS actions:`)
-            console.dir(bestActions)
+            // console.log(`Best PRS actions:`)
+            // console.dir(bestActions)
 
             if (!bestActions[0]) {
               return this.pass()
             }
 
             this.actionsOnHold = bestActions.slice(1).map(action => this.simulationActionToClientAction(action))
+            if (this.actionsOnHold.length) {
+              console.log(`Stored ${this.actionsOnHold.length} actions on hold`)
+              console.dir(this.actionsOnHold)
+            }
             const bestAction = bestActions[0]
+            console.log('Chosen action:')
+            console.log(JSON.stringify(bestAction, null, 2))
             return this.simulationActionToClientAction(bestAction)
           }
 

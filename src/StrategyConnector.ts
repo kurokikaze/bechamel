@@ -3,6 +3,15 @@ import { GameState } from "./GameState"
 import {Strategy} from './strategies/Strategy'
 import { SerializedClientState } from "./types"
 
+const STEP_NAMES: Record<number, string> = {
+  0: 'Energize',
+  1: 'Power/Relic/Spell (1)',
+  2: 'Attack',
+  3: 'Creatures',
+  4: 'Power/Relic/Spell (2)',
+  5: 'Draw',
+}
+
 export const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
   let timeout: NodeJS.Timeout
 
@@ -56,12 +65,16 @@ export class StrategyConnector {
   }
 
   private requestAndSendAction() {
+    const inPromptState = this.gameState.isInPromptState(this.playerId)
     if (this.strategy && this.gameState && this.playerId &&
-        (this.gameState.playerPriority(this.playerId) || this.gameState.isInPromptState(this.playerId))
+        (this.gameState.playerPriority(this.playerId) || inPromptState)
     ) {
+      console.log(`Step is ${STEP_NAMES[this.gameState.getStep()]}, ${inPromptState ? 'in prompt state ' : ''} requesting action`)
       const action = this.strategy.requestAction()
       if (action) {
         this.io.emit('clientAction', action)
+      } else {
+        console.log('No action returned from request')
       }
     }
   }
