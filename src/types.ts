@@ -13,6 +13,10 @@ export type Challenge = {
   userId: number
 }
 
+export type GameResponse = {
+  hash: string
+}
+
 export interface EnrichedAction {
   source?: CardInGame;
   power?: boolean;

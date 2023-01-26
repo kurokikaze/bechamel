@@ -1,5 +1,5 @@
 import fetch from 'isomorphic-fetch'
-import { Challenge } from "./types"
+import { Challenge, GameResponse } from "./types"
 
 export class DragonlandService {
   private cookie: string = ''
@@ -54,7 +54,7 @@ export class DragonlandService {
     }
    }
 
-  public async getChallenges(): Promise<Challenge[]> {
+  public async getChallenges(): Promise<GameResponse|Challenge[]> {
     try {
       console.log(`Getting challenges with cookie ${this.cookie}`)
       const response = await fetch(`${this.address}/api/challenges`, {
@@ -75,7 +75,7 @@ export class DragonlandService {
       }
       const data = await response.json()
 
-      return data as Challenge[]
+      return data as GameResponse|Challenge[]
     } catch(e) {
       console.dir(e)
       throw new Error('Failed to fetch challenges')
@@ -102,6 +102,40 @@ export class DragonlandService {
       console.dir(e)
       throw new Error('Failed to accept the challenge')
     }
+  }
+
+  public async createChallenge(deckId: string): Promise<null> {
+    try {
+      const response = await fetch(`${this.address}/api/challenges`, {
+        method: 'POST',
+        headers: {
+          Cookie: this.cookie,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          deckId,
+        }, null, 2),
+      })
+
+      return null
+    } catch(e) {
+      console.dir(e)
+      throw new Error('Failed to create the challenge')
+    }
+  }
+
+  public async waitForGame(callback: (gameHash: string) => Promise<void>) {
+    console.log('Waiting for the challenger')
+    const timer = setInterval(async () => {
+      const challenges = await this.getChallenges()
+
+      if ('hash' in challenges) {
+        clearInterval(timer)
+        callback(challenges.hash)
+        console.log('Game found, stopping the watcher')
+      }
+    }, 3000)
+
   }
 
   public async accessGame(playerHash: string): Promise<void> {
