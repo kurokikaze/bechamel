@@ -65,16 +65,22 @@ export function createState(myCreatures, enemyCreatures, myMagi, opponentMagi, p
     const sim = new State(Object.assign(Object.assign({}, defaultState), { zones, step: STEP_ATTACK, activePlayer: playerId, prompt: false, promptParams: {}, log: [] }));
     sim.setPlayers(playerId, opponentId);
     const myMagiActualCard = byName(myMagi === null || myMagi === void 0 ? void 0 : myMagi.card);
-    if (myMagiActualCard) {
+    if (myMagi && myMagiActualCard) {
+        if (!myMagi.data.actionsUsed) {
+            console.log('Found the case with missing actionsUsed');
+            console.dir(myMagi);
+            console.log('data:');
+            console.dir(myMagi.data);
+        }
         const myMagiCard = new CardInGame(myMagiActualCard, playerId).addEnergy(myMagi.data.energy);
         myMagiCard.data.actionsUsed = [...myMagi.data.actionsUsed];
         myMagiCard.id = myMagi.id;
         sim.getZone(ZONE_TYPE_ACTIVE_MAGI, playerId).add([myMagiCard]);
     }
     const enemyMagiRealCard = byName(opponentMagi === null || opponentMagi === void 0 ? void 0 : opponentMagi.card);
-    if (enemyMagiRealCard) {
+    if (opponentMagi && enemyMagiRealCard) {
         const enemyMagiCard = new CardInGame(enemyMagiRealCard, opponentId).addEnergy(opponentMagi.data.energy);
-        enemyMagiCard.data.actionsUsed = [...myMagi.data.actionsUsed];
+        enemyMagiCard.data.actionsUsed = [...opponentMagi.data.actionsUsed];
         enemyMagiCard.id = opponentMagi.id;
         sim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponentId).add([enemyMagiCard]);
     }

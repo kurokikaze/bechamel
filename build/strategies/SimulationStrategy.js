@@ -1,6 +1,6 @@
 import { byName } from 'moonlands/dist/cards';
 import CardInGame from 'moonlands/dist/classes/CardInGame';
-import { ZONE_TYPE_HAND, ACTION_ATTACK, ACTION_PASS, ACTION_PLAY, ACTION_POWER, ACTION_RESOLVE_PROMPT, PROMPT_TYPE_CHOOSE_CARDS, TYPE_CREATURE, TYPE_RELIC, ZONE_TYPE_MAGI_PILE, } from "../const";
+import { PROMPT_TYPE_MAY_ABILITY, ZONE_TYPE_HAND, ACTION_ATTACK, ACTION_PASS, ACTION_PLAY, ACTION_POWER, ACTION_RESOLVE_PROMPT, PROMPT_TYPE_CHOOSE_CARDS, TYPE_CREATURE, TYPE_RELIC, ZONE_TYPE_MAGI_PILE, } from "../const";
 import { createState, getStateScore } from './simulationUtils';
 import { HashBuilder } from './HashBuilder';
 import { ActionExtractor } from './ActionExtractor';
@@ -18,6 +18,7 @@ export class SimulationStrategy {
         this.leaves = new Map();
         this.graph = '';
         this.actionsOnHold = [];
+        this.StoredTree = [];
         this.hashBuilder = new HashBuilder();
     }
     setup(state, playerId) {
@@ -123,7 +124,7 @@ export class SimulationStrategy {
             return this.pass();
         }
         // Simulation itself
-        let failsafe = 10000;
+        let failsafe = SimulationStrategy.failsafe;
         let counter = 0;
         while (simulationQueue.length && failsafe > 0) {
             failsafe -= 1;
@@ -183,10 +184,9 @@ export class SimulationStrategy {
             return [this.pass()];
         }
         // Simulation itself
-        let failsafe = 10000;
         let counter = 0;
         this.leaves.clear();
-        while (simulationQueue.length && counter <= failsafe) {
+        while (simulationQueue.length && counter <= SimulationStrategy.failsafe) {
             counter += 1;
             const workEntity = simulationQueue.shift();
             if (workEntity && workEntity.action) {
@@ -237,11 +237,50 @@ export class SimulationStrategy {
         console.log(`Best found score is ${bestAction.score} (initial is ${initialScore})`);
         return bestAction.action;
     }
+    shouldClearHeldActions() {
+        if (!this.actionsOnHold.length)
+            return false;
+        const action = this.actionsOnHold[0];
+        if (this.gameState.getStep() === STEP_NAME.CREATURES) {
+            const playableCards = this.gameState.getPlayableCards();
+            const ids = new Set(playableCards.map(({ id }) => id));
+            if (action.type === ACTION_PLAY &&
+                !ids.has(action.payload.card)) {
+                console.log(`Failed summon, passing. Dropping ${this.actionsOnHold.length} actions on hold.`);
+                return true;
+            }
+        }
+        else if (this.gameState.getStep() === STEP_NAME.PRS1 || this.gameState.getStep() === STEP_NAME.PRS2) {
+            const creaturesRelicsAndMagi = [
+                ...this.gameState.getMyCreaturesInPlay(),
+                ...this.gameState.getMyRelicsInPlay(),
+            ];
+            const myMagi = this.gameState.getMyMagi();
+            if (myMagi) {
+                creaturesRelicsAndMagi.push(myMagi);
+            }
+            const ids = new Set(creaturesRelicsAndMagi.map(({ id }) => id));
+            if (action.type === ACTION_POWER &&
+                !ids.has(action.source)) {
+                console.log(`Failed power activation, no card with id ${action.source} (power to be activated is ${action.power}). Dropping ${this.actionsOnHold.length} actions on hold.`);
+                this.actionsOnHold = [];
+                return true;
+            }
+        }
+        else if (this.gameState.getStep() === STEP_NAME.ATTACK) {
+            if (!(action.type === ACTION_PASS || action.type === ACTION_ATTACK)) {
+                console.log('Non-attack action in the attack step');
+                return true;
+            }
+        }
+        return false;
+    }
     requestAction() {
+        if (this.shouldClearHeldActions()) {
+            this.actionsOnHold = [];
+        }
         if (this.actionsOnHold.length) {
             const action = this.actionsOnHold.shift();
-            console.log('Sending action from hold:');
-            console.dir(action);
             // If we are passing at the creatures step, clear the actions on hold
             if (action.type === ACTION_PASS && this.gameState.getStep() === STEP_NAME.CREATURES) {
                 this.actionsOnHold = [];
@@ -254,6 +293,14 @@ export class SimulationStrategy {
                     type: ACTION_RESOLVE_PROMPT,
                     promptType: PROMPT_TYPE_CHOOSE_CARDS,
                     cards: this.gameState.getStartingCards(),
+                    player: this.playerId,
+                };
+            }
+            if (this.gameState.isInPromptState && this.gameState.getPromptType() === PROMPT_TYPE_MAY_ABILITY) {
+                return {
+                    type: ACTION_RESOLVE_PROMPT,
+                    promptType: PROMPT_TYPE_MAY_ABILITY,
+                    useEffect: false,
                     player: this.playerId,
                 };
             }
@@ -315,7 +362,7 @@ export class SimulationStrategy {
                         this.actionsOnHold = bestActions.slice(1).map(action => this.simulationActionToClientAction(action));
                         if (this.actionsOnHold.length) {
                             console.log(`Stored ${this.actionsOnHold.length} actions on hold`);
-                            console.dir(this.actionsOnHold);
+                            // console.dir(this.actionsOnHold)
                         }
                         const bestAction = bestActions[0];
                         console.log('Chosen action:');
@@ -324,6 +371,9 @@ export class SimulationStrategy {
                     }
                     case STEP_NAME.CREATURES: {
                         const myMagiCard = this.gameState.getMyMagi();
+                        if (!myMagiCard) {
+                            return this.pass();
+                        }
                         const myMagi = Object.assign(Object.assign({}, myMagiCard), { _card: byName(myMagiCard.card) });
                         const availableEnergy = myMagi.data.energy;
                         const playable = this.gameState.getPlayableCards()
@@ -366,3 +416,5 @@ export class SimulationStrategy {
 // public static deckId = '62ed47ae99dd0db04e9f657b' // Online deck
 // public static deckId = '5f60e45e11283f7c98d9259b' // Local deck (Naroom)
 SimulationStrategy.deckId = '5f60e45e11283f7c98d9259c'; // Local deck (Arderial)
+// public static deckId = '6305ec3aa14ce19348dfd7f9' // Local deck (Underneath/Naroom)
+SimulationStrategy.failsafe = 1000;

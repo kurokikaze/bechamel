@@ -20,7 +20,7 @@ import {
   TYPE_CREATURE, TYPE_RELIC,
   ZONE_TYPE_MAGI_PILE,
 } from "../const";
-import {GameState, SimplifiedCard} from "../GameState";
+import {ClientCard, GameState, SimplifiedCard} from "../GameState";
 import {Strategy} from './Strategy';
 import {createState, getStateScore, booleanGuard} from './simulationUtils'
 import {HashBuilder} from './HashBuilder';
@@ -55,6 +55,8 @@ export class SimulationStrategy implements Strategy {
   public static deckId = '5f60e45e11283f7c98d9259c' // Local deck (Arderial)
   // public static deckId = '6305ec3aa14ce19348dfd7f9' // Local deck (Underneath/Naroom)
 
+  public static failsafe = 1000
+
   private waitingTarget?: {
     source: string
     target: string
@@ -67,6 +69,7 @@ export class SimulationStrategy implements Strategy {
   private graph: string = ''
 
   private actionsOnHold: any[] = []
+  private StoredTree: SimulationEntity[] = []
 
   constructor() {
     this.hashBuilder = new HashBuilder()
@@ -180,7 +183,7 @@ export class SimulationStrategy implements Strategy {
       return this.pass()
     }
     // Simulation itself
-    let failsafe = 10000
+    let failsafe = SimulationStrategy.failsafe
     let counter = 0
     while (simulationQueue.length && failsafe > 0) {
       failsafe -= 1
@@ -242,12 +245,11 @@ export class SimulationStrategy implements Strategy {
       return [this.pass()]
     }
     // Simulation itself
-    let failsafe = 10000
     let counter = 0
     
     this.leaves.clear()
 
-    while (simulationQueue.length && counter <= failsafe) {
+    while (simulationQueue.length && counter <= SimulationStrategy.failsafe) {
       counter += 1
       const workEntity = simulationQueue.shift()
       if (workEntity && workEntity.action) {
@@ -302,11 +304,55 @@ export class SimulationStrategy implements Strategy {
     return bestAction.action
   }
 
+  private shouldClearHeldActions(): boolean {
+    if (!this.actionsOnHold.length) return false
+
+    const action = this.actionsOnHold[0]
+    if (this.gameState.getStep() === STEP_NAME.CREATURES) {
+      const playableCards = this.gameState.getPlayableCards()
+      const ids = new Set(playableCards.map(({id}) => id))
+      if (
+        action.type === ACTION_PLAY &&
+        !ids.has(action.payload.card)
+      ) {
+        console.log(`Failed summon, passing. Dropping ${this.actionsOnHold.length} actions on hold.`)
+        return true;
+      }
+    } else if (this.gameState.getStep() === STEP_NAME.PRS1 || this.gameState.getStep() === STEP_NAME.PRS2) {
+      const creaturesRelicsAndMagi: ClientCard[] = [
+        ...this.gameState.getMyCreaturesInPlay(),
+        ...this.gameState.getMyRelicsInPlay(),
+      ]
+      const myMagi = this.gameState.getMyMagi()
+      if (myMagi) {
+        creaturesRelicsAndMagi.push(myMagi)
+      }
+      const ids = new Set(creaturesRelicsAndMagi.map(({id}) => id))
+      if (
+        action.type === ACTION_POWER &&
+        !ids.has(action.source)
+      ) {
+        console.log(`Failed power activation, no card with id ${action.source} (power to be activated is ${action.power}). Dropping ${this.actionsOnHold.length} actions on hold.`)
+        this.actionsOnHold = []
+        return true;
+      }
+    } else if (this.gameState.getStep() === STEP_NAME.ATTACK) {
+      if (!(action.type === ACTION_PASS || action.type === ACTION_ATTACK)) {
+        console.log('Non-attack action in the attack step')
+        return true
+      }
+    }
+    return false
+  }
+
   public requestAction() {
+    if (this.shouldClearHeldActions()) {
+      this.actionsOnHold = []
+    }
+
     if (this.actionsOnHold.length) {
       const action = this.actionsOnHold.shift()
-      console.log('Sending action from hold:')
-      console.dir(action)
+      
       // If we are passing at the creatures step, clear the actions on hold
       if (action.type === ACTION_PASS && this.gameState.getStep() === STEP_NAME.CREATURES) {
         this.actionsOnHold = []
@@ -320,6 +366,15 @@ export class SimulationStrategy implements Strategy {
           type: ACTION_RESOLVE_PROMPT,
           promptType: PROMPT_TYPE_CHOOSE_CARDS,
           cards: this.gameState.getStartingCards(),
+          player: this.playerId,
+        }
+      }
+
+      if (this.gameState.isInPromptState && this.gameState.getPromptType() === PROMPT_TYPE_MAY_ABILITY) {
+        return {
+          type: ACTION_RESOLVE_PROMPT,
+          promptType: PROMPT_TYPE_MAY_ABILITY,
+          useEffect: false,
           player: this.playerId,
         }
       }
@@ -391,7 +446,7 @@ export class SimulationStrategy implements Strategy {
             this.actionsOnHold = bestActions.slice(1).map(action => this.simulationActionToClientAction(action))
             if (this.actionsOnHold.length) {
               console.log(`Stored ${this.actionsOnHold.length} actions on hold`)
-              console.dir(this.actionsOnHold)
+              // console.dir(this.actionsOnHold)
             }
             const bestAction = bestActions[0]
             console.log('Chosen action:')
@@ -401,6 +456,9 @@ export class SimulationStrategy implements Strategy {
 
           case STEP_NAME.CREATURES: {
             const myMagiCard = this.gameState.getMyMagi()
+            if (!myMagiCard) {
+              return this.pass()
+            }
             const myMagi: ExpandedClientCard = {
               ...myMagiCard,
               _card: byName(myMagiCard.card)

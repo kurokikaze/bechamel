@@ -53,7 +53,7 @@ export interface SimplifiedCard {
   data: Object,
 }
 
-type ClientCard = {
+export type ClientCard = {
   card: string,
   id: string,
   data: {

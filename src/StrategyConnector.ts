@@ -66,15 +66,18 @@ export class StrategyConnector {
 
   private requestAndSendAction() {
     const inPromptState = this.gameState.isInPromptState(this.playerId)
+    const currentStep = this.gameState.getStep()
     if (this.strategy && this.gameState && this.playerId &&
         (this.gameState.playerPriority(this.playerId) || inPromptState)
     ) {
-      console.log(`Step is ${STEP_NAMES[this.gameState.getStep()]}, ${inPromptState ? 'in prompt state ' : ''} requesting action`)
-      const action = this.strategy.requestAction()
-      if (action) {
-        this.io.emit('clientAction', action)
-      } else {
-        console.log('No action returned from request')
+      if (currentStep !== 5) {
+        console.log(`Step is ${STEP_NAMES[currentStep]}, ${inPromptState ? 'in prompt state ' : ''} requesting action`)
+        const action = this.strategy.requestAction()
+        if (action) {
+          this.io.emit('clientAction', action)
+        } else {
+          console.log('No action returned from request')
+        }
       }
     }
   }
