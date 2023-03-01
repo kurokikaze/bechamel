@@ -2874,16 +2874,15 @@ minimatch@^3.0.4, minimatch@^3.1.1:
   dependencies:
     brace-expansion "^1.1.7"
 
-"moonlands@https://github.com/kurokikaze/moonlands/archive/refs/tags/v0.11.12.tar.gz":
-  version "0.11.12"
-  resolved "https://github.com/kurokikaze/moonlands/archive/refs/tags/v0.11.12.tar.gz#095d7cadd787b30e2e707e362849d76f65f4bcfb"
+"moonlands@https://github.com/kurokikaze/moonlands/archive/refs/tags/v0.13.1.tar.gz":
+  version "0.12.0"
+  resolved "https://github.com/kurokikaze/moonlands/archive/refs/tags/v0.13.1.tar.gz#77c5c74616e2c519e9a2e364455d903ef6f0b98a"
   dependencies:
     "@babel/preset-env" "^7.11.5"
     "@babel/preset-typescript" "^7.12.7"
-    "@types/nanoid" "^3.0.0"
     "@types/node" ">=4.2.0 < 13"
     is-promise "^2.1.0"
-    nanoid "^2.1.9"
+    nanoid "^3.0.0"
     socket.io "^2.3.0"
     typescript "^4.7.4"
 
@@ -2907,10 +2906,10 @@ nanoid@*, nanoid@^4.0.0:
   resolved "https://registry.yarnpkg.com/nanoid/-/nanoid-4.0.0.tgz#6e144dee117609232c3f415c34b0e550e64999a5"
   integrity sha512-IgBP8piMxe/gf73RTQx7hmnhwz0aaEXYakvqZyE302IXW3HyVNhdNGC+O2MwMAVhLEnvXlvKtGbtJf6wvHihCg==
 
-nanoid@^2.1.9:
-  version "2.1.11"
-  resolved "https://registry.yarnpkg.com/nanoid/-/nanoid-2.1.11.tgz#ec24b8a758d591561531b4176a01e3ab4f0f0280"
-  integrity sha512-s/snB+WGm6uwi0WjsZdaVcuf3KJXlfGl2LcxgwkEwJF0D/BWzVWAZW/XY4bFaiR7s0Jk3FPvlnepg1H1b1UwlA==
+nanoid@^3.0.0:
+  version "3.3.4"
+  resolved "https://registry.yarnpkg.com/nanoid/-/nanoid-3.3.4.tgz#730b67e3cd09e2deacf03c027c81c9d9dbc5e8ab"
+  integrity sha512-MqBkQh/OHTS2egovRtLk45wEyNXwF+cokD+1YPf9u5VfJiRdAiRwB2froX5Co9Rh20xs4siNPm8naNotSD6RBw==
 
 natural-compare@^1.4.0:
   version "1.4.0"

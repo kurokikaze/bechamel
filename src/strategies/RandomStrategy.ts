@@ -9,7 +9,7 @@ import {
   PROMPT_TYPE_CHOOSE_CARDS,
   TYPE_CREATURE, TYPE_RELIC
 } from "../const";
-import {GameState, SimplifiedCard} from "../GameState";
+import {GameState} from "../GameState";
 import {Strategy} from './Strategy';
 
 export const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {

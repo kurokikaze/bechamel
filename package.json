@@ -18,7 +18,7 @@
     "@types/node": "^18.0.3",
     "@types/node-fetch": "^2.6.2",
     "isomorphic-fetch": "^3.0.0",
-    "moonlands": "https://github.com/kurokikaze/moonlands/archive/refs/tags/v0.11.12.tar.gz",
+    "moonlands": "https://github.com/kurokikaze/moonlands/archive/refs/tags/v0.13.1.tar.gz",
     "nanoid": "^4.0.0",
     "socket.io-client": "^4.5.1",
     "ts-node": "^10.9.1",
