@@ -354,8 +354,6 @@ export class SimulationStrategy {
                         if (finalHash !== hash) {
                             console.log(`Change leak! hashes mismatch: ${hash} => ${finalHash}`);
                         }
-                        // console.log(`Best PRS actions:`)
-                        // console.dir(bestActions)
                         if (!bestActions[0]) {
                             return this.pass();
                         }

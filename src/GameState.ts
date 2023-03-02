@@ -29,6 +29,7 @@ import {
   EFFECT_TYPE_PAYING_ENERGY_FOR_SPELL,
   EFFECT_TYPE_REARRANGE_ENERGY_ON_CREATURES,
   EFFECT_TYPE_START_OF_TURN,
+
   PROMPT_TYPE_CHOOSE_CARDS,
   ZONE_TYPE_IN_PLAY,
   ZONE_TYPE_ACTIVE_MAGI,
@@ -37,7 +38,6 @@ import {
   ZONE_TYPE_DISCARD,
   ZONE_TYPE_HAND,
   ZONE_TYPE_MAGI_PILE,
-  PROMPT_TYPE_SINGLE_CREATURE,
 } from './const'
 import {byName} from 'moonlands/src/cards'
 import {ExpandedClientCard, HiddenCard, SerializedClientState, StateRepresentation} from './types'
@@ -210,6 +210,14 @@ export class GameState {
 
   public getMyMagiPile(): ClientCard[] {
     return this.state.zones.playerMagiPile
+  }
+
+  public hasGameEnded(): boolean {
+    return this.state.gameEnded;
+  }
+
+  public getWinner(): number {
+    return this.state.winner;
   }
 
   public getOpponentMagi(): ClientCard {

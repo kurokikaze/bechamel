@@ -43,7 +43,7 @@ export class StrategyConnector {
       strategy.setup(this.gameState, this.playerId)
       console.log('We got the game data')
       if (this.gameState.playerPriority(this.playerId) || this.gameState.isInPromptState(this.playerId)) {
-        dRequestAction()
+        this.requestAndSendAction()
       }
     })
 
@@ -57,9 +57,18 @@ export class StrategyConnector {
           console.log(e?.message)
         }
 
-        if (this.gameState.playerPriority(this.playerId) || this.gameState.isInPromptState(this.playerId)) {
-          dRequestAction()
+        if (this.gameState.hasGameEnded()) {
+          console.log(this.gameState.getWinner() === this.playerId ? 'We won' : 'We lost');
+          this.io.close();
+          process.exit(0);
+          return true;
         }
+
+        if (action.type === 'display/priority') {
+          if (action.player === this.playerId) {
+            this.requestAndSendAction()
+          }
+        } 
       }
     })
   }
