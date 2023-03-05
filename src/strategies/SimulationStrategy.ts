@@ -470,6 +470,7 @@ export class SimulationStrategy implements Strategy {
               })
             if (playable.length) {
               const playableCreature = playable[0]
+              console.log(`Magi energy is ${availableEnergy}, playing card ${playableCreature.id}`);
               return this.play(playableCreature.id)
             }
             return this.pass()
