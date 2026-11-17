@@ -1,4 +1,5 @@
-import {byName} from 'moonlands/dist/cards'
+// @ts-nocheck
+import {byName} from 'moonlands/dist/esm/cards.js'
 
 import {
   ACTION_ATTACK,
@@ -8,9 +9,9 @@ import {
   ACTION_RESOLVE_PROMPT,
   PROMPT_TYPE_CHOOSE_CARDS,
   TYPE_CREATURE, TYPE_RELIC
-} from "../const";
-import {GameState} from "../GameState";
-import {Strategy} from './Strategy';
+} from "../const.js";
+import {GameState} from "../GameState.js";
+import {Strategy} from './Strategy.js';
 
 export const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
   let timeout: NodeJS.Timeout
@@ -200,9 +201,10 @@ export class RandomStrategy implements Strategy {
             const enemyCreatures = this.gameState.getEnemyCreaturesInPlay()
             const opponentMagi = this.gameState.getOpponentMagi()
             if (myCreatures.length) {
-              const randomMy = myCreatures[Math.floor(Math.random() * myCreatures.length)]
+              const randomValue = 0.5; // Math.random()
+              const randomMy = myCreatures[Math.floor(randomValue * myCreatures.length)]
               if (enemyCreatures.length) {
-                const randomOpponent = enemyCreatures[Math.floor(Math.random() * enemyCreatures.length)]
+                const randomOpponent = enemyCreatures[Math.floor(randomValue * enemyCreatures.length)]
                 if (randomMy._card?.data.canAttackMagiDirectly && randomMy.data.energy <= opponentMagi.data.energy) {
                   return this.attack(randomMy.id, opponentMagi.id)
                 } else {

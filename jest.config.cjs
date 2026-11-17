@@ -1,12 +1,7 @@
-/** @type {import('ts-jest/dist/types').InitialOptionsTsJest} */
 module.exports = {
-  preset: 'ts-jest',
+  transform: { '^.+\\.ts$': ['ts-jest', { useESM: true, tsconfig: 'tsconfig.test.json' }] },
+  extensionsToTreatAsEsm: ['.ts'],
+  moduleNameMapper: { '^(\\.{1,2}/.*)\\.js$': '$1' },
   testEnvironment: 'node',
-  transform: {
-    '^src/tests/.+ts$': 'ts-jest',
-    "^.+\\.js$": "ts-jest",
-  },
-  transformIgnorePatterns: [
-    
-  ],
+  testMatch: ['<rootDir>/src/**/*.test.ts'],
 };

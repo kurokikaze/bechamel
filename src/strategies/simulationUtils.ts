@@ -1,11 +1,11 @@
-import {byName} from 'moonlands/src/cards'
-import {State, TYPE_RELIC} from 'moonlands/src'
-import CardInGame from 'moonlands/src/classes/CardInGame'
-import Zone from 'moonlands/src/classes/Zone'
+import {byName} from 'moonlands/dist/esm/cards.js'
+import {State, TYPE_RELIC} from 'moonlands/dist/esm/index.js'
+import CardInGame from 'moonlands/dist/esm/classes/CardInGame.js'
+import Zone from 'moonlands/dist/esm/classes/Zone.js'
 
-import { ZONE_TYPE_HAND, ZONE_TYPE_DECK, ZONE_TYPE_DISCARD, ZONE_TYPE_ACTIVE_MAGI, ZONE_TYPE_MAGI_PILE, ZONE_TYPE_DEFEATED_MAGI, ZONE_TYPE_IN_PLAY, TYPE_CREATURE } from "../const";
-import { GameState } from '../GameState';
-import Card from 'moonlands/src/classes/Card';
+import { ZONE_TYPE_HAND, ZONE_TYPE_DECK, ZONE_TYPE_DISCARD, ZONE_TYPE_ACTIVE_MAGI, ZONE_TYPE_MAGI_PILE, ZONE_TYPE_DEFEATED_MAGI, ZONE_TYPE_IN_PLAY, TYPE_CREATURE } from "../const.js";
+import { GameState } from '../GameState.js';
+import Card from 'moonlands/dist/esm/classes/Card.js';
 
 const addCardData = (card: any) => ({
   ...card,
@@ -39,6 +39,7 @@ const defaultState: StateShape = {
 	fallbackActions: [],
 	continuousEffects: [],
 	activePlayer: 0,
+  controllingPlayer: 0,
 	prompt: false,
 	promptType: null,
 	promptParams: {},
@@ -166,7 +167,27 @@ export function createState(
   sim.state.continuousEffects = gameState.getContinuousEffects();
   sim.state.step = gameState.getStep()
   const seed = gameState.getTurn() * 100 + gameState.getStep() * 10 + gameState.playerId
+  // console.log(`${gameState.getTurn()} * 100 + ${gameState.getStep()} * 10 + ${gameState.playerId}`)
   sim.initiatePRNG(seed)
+  // Carry over spellMetaData: mid-spell/power prompts (e.g. Fire Flow's "target" then "number"
+  // prompts) resolve across separate generateAction() calls, each rebuilding the sim from scratch.
+  // Without this, variables stored by an earlier real prompt resolution (like $target) are lost,
+  // and the next step's effect (e.g. move_energy) reads a null/undefined metadata value.
+  sim.state.spellMetaData = { ...(gameState.state as any).spellMetaData }
+  if (gameState.state.prompt) {
+    const livePromptState = gameState.state as any
+    sim.state.prompt = true
+    ;(sim.state as any).promptPlayer = livePromptState.promptPlayer ?? undefined
+    sim.state.promptType = livePromptState.promptType
+    ;(sim.state as any).promptMessage = livePromptState.promptMessage ?? undefined
+    ;(sim.state as any).promptGeneratedBy = livePromptState.promptGeneratedBy ?? undefined
+    ;(sim.state as any).promptVariable = livePromptState.promptVariable ?? undefined
+    ;(sim.state as any).promptParams = { ...(livePromptState.promptParams ?? {}) }
+    ;(sim.state as any).actions = [...(livePromptState.actions ?? [])]
+    ;(sim.state as any).savedActions = [...(livePromptState.savedActions ?? [])]
+    ;(sim.state as any).mayEffectActions = [...(livePromptState.mayEffectActions ?? [])]
+    ;(sim.state as any).fallbackActions = [...(livePromptState.fallbackActions ?? [])]
+  }
   return sim
 }
 

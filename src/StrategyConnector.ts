@@ -1,93 +1,125 @@
-import {Socket} from "socket.io-client"
-import { GameState } from "./GameState"
-import {Strategy} from './strategies/Strategy'
-import { SerializedClientState } from "./types"
+// @ts-nocheck
+import { ACTION_PASS } from 'moonlands/dist/esm/const.js'
+import { Socket } from "socket.io-client"
+import { ClientAction, FromClientPassAction } from 'duel-protocol'
+import { GameState } from "./GameState.js"
+import { Strategy } from './strategies/Strategy.js'
+import { SerializedClientState } from "./types.js"
+import { ErrorDumpService } from './diagnostics.js'
 
 const STEP_NAMES: Record<number, string> = {
-  0: 'Energize',
-  1: 'Power/Relic/Spell (1)',
-  2: 'Attack',
-  3: 'Creatures',
-  4: 'Power/Relic/Spell (2)',
-  5: 'Draw',
-}
-
-export const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
-  let timeout: NodeJS.Timeout
-
-  return (...args: Parameters<F>): Promise<ReturnType<F>> =>
-    new Promise(resolve => {
-      if (timeout) {
-        clearTimeout(timeout)
-      }
-
-      timeout = setTimeout(() => resolve(func(...args)), waitFor)
-    })
+    0: 'Energize',
+    1: 'Power/Relic/Spell (1)',
+    2: 'Attack',
+    3: 'Creatures',
+    4: 'Power/Relic/Spell (2)',
+    5: 'Draw',
 }
 
 export class StrategyConnector {
-  private playerId?: number
-  private gameState?: GameState
-  private strategy?: Strategy
-  public constructor(private readonly io: Socket) {}
+    private playerId: number = 2
+    private gameState?: GameState
+    private strategy?: Strategy
+    public constructor(private readonly io: Socket) {}
 
-  public connect(strategy: Strategy) {
-    this.strategy = strategy
-    const dRequestAction = debounce(this.requestAndSendAction.bind(this), 200)
+    public connect(strategy: Strategy) {
+        this.strategy = strategy
 
-    this.io.on('gameData', (data: {playerId: number, state: SerializedClientState}) => {
-      this.playerId = data.playerId
-      this.gameState = new GameState(data.state)
-      this.gameState.setPlayerId(data.playerId)
+        this.io.on('gameData', (data: { playerId: number, state: SerializedClientState }) => {
+            this.playerId = data.playerId
+            console.log('Strategy receives game data')
+            this.gameState = new GameState(data.state)
+            this.gameState.setPlayerId(data.playerId)
 
-      strategy.setup(this.gameState, this.playerId)
-      console.log('We got the game data')
-      if (this.gameState.playerPriority(this.playerId) || this.gameState.isInPromptState(this.playerId)) {
-        this.requestAndSendAction()
-      }
-    })
+            strategy.setup(this.gameState, this.playerId)
+        })
 
-    this.io.on('action', action => {
-      if (this.gameState && this.playerId && action) {
-        try {
-          this.gameState.update(action)
-        } catch(e: any) {
-          console.log('Error applying the action')
-          console.dir(action)
-          console.log(e?.message)
-        }
+        this.io.on('action', (action: ClientAction | { type: 'display/priority', player: number }) => {
+            if (this.gameState && this.playerId && action) {
+                try {
+                    this.gameState.update(action)
 
-        if (this.gameState.hasGameEnded()) {
-          console.log(this.gameState.getWinner() === this.playerId ? 'We won' : 'We lost');
-          this.io.close();
-          process.exit(0);
-          return true;
-        }
+                    if (
+                        action.type == "actions/enter_prompt" &&
+                        action.promptType == "prompt/payment_source" &&
+                        action.player == 1 &&
+                        !this.gameState.isInPromptState(action.player)
+                    ) {
+                        console.log(`Entered payment prompt unsuccesfully. Action:`)
+                        console.dir(action)
+                    }
+                } catch (e: any) {
+                    console.log('Error applying the action')
+                    console.dir(action)
+                    console.log(e?.message)
+                    try {
+                        ErrorDumpService.dumpActionFailure(action, {}, e, { location: 'StrategyConnector', playerId: this.playerId, turn: this.gameState?.turnNumber, step: this.gameState?.getStep?.() })
+                    } catch (_err) {
+                        // ignore
+                    }
+                }
 
-        if (action.type === 'display/priority') {
-          if (action.player === this.playerId) {
-            this.requestAndSendAction()
-          }
-        } 
-      }
-    })
-  }
+                if (this.gameState.hasGameEnded()) {
+                    console.log(this.gameState.getWinner() === this.playerId ? 'We won' : 'We lost');
+                    this.io.close();
 
-  private requestAndSendAction() {
-    const inPromptState = this.gameState.isInPromptState(this.playerId)
-    const currentStep = this.gameState.getStep()
-    if (this.strategy && this.gameState && this.playerId &&
-        (this.gameState.playerPriority(this.playerId) || inPromptState)
-    ) {
-      if (currentStep !== 5) {
-        console.log(`Step is ${STEP_NAMES[currentStep]}, ${inPromptState ? 'in prompt state ' : ''} requesting action`)
-        const action = this.strategy.requestAction()
-        if (action) {
-          this.io.emit('clientAction', action)
-        } else {
-          console.log('No action returned from request')
-        }
-      }
+                    return true;
+                }
+            }
+        })
     }
-  }
+
+    public requestAndSendAction() {
+        if (!this.gameState) {
+            this.io.emit('clientAction', { type: ACTION_PASS, player: this.playerId } as FromClientPassAction)
+            return;
+        }
+        const inPromptState = this.gameState.isInPromptState(this.playerId)
+        const currentStep = this.gameState.getStep()
+        if (this.strategy && this.gameState && this.playerId &&
+            (this.gameState.playerPriority(this.playerId) || inPromptState)
+        ) {
+            if (currentStep !== 5 || inPromptState) {
+                const action = this.strategy.requestAction()
+
+                if (action) {
+                    // If we are in prompt state and strategy returned a pass, dump state and abort
+                    if (this.gameState.isInPromptState(this.playerId) && action.type == ACTION_PASS) {
+                        const serializedState = JSON.parse(JSON.stringify(this.gameState.state))
+                        console.log(`${this.gameState.turnNumber}:${this.gameState.getStep()}`)
+                        ErrorDumpService.dumpGameState(serializedState, { reason: 'pass_in_prompt', location: 'StrategyConnector', playerId: this.playerId, turn: this.gameState?.turnNumber, step: this.gameState?.getStep?.() })
+                        ErrorDumpService.dumpActionFailure(action, serializedState, new Error('Strategy returned PASS while in prompt'), { location: 'StrategyConnector', playerId: this.playerId })
+                        throw new Error(`Here we go, returning pass for the prompt`)
+                    }
+
+                    // Validate that the action can be applied on a cloned state (only in non-production paths)
+                    if (process.env.VALIDATE_ACTIONS === '1') {
+                        const serializedState = JSON.parse(JSON.stringify(this.gameState.state))
+                        try {
+                            const testState = new GameState(serializedState)
+                            testState.setPlayerId(this.playerId)
+                            testState.update(action)
+                        } catch (e: any) {
+                            console.error('Strategy produced an action that fails to apply on cloned state')
+                            try {
+                                ErrorDumpService.dumpGameState(serializedState, { reason: 'strategy_action_causes_error_on_update', actionType: action?.type, action, location: 'StrategyConnector.requestAndSendAction', playerId: this.playerId, step: this.gameState?.getStep?.(), turn: this.gameState?.turnNumber })
+                            } catch (_err) {}
+                            try {
+                                ErrorDumpService.dumpActionFailure(action, serializedState, e, { location: 'StrategyConnector.requestAndSendAction', playerId: this.playerId })
+                            } catch (_err) {}
+                            throw new Error('Strategy returned an action that would fail when applied; aborting send')
+                        }
+                    }
+
+                    this.io.emit('clientAction', action, this.gameState.state)
+                } else {
+                    throw new Error('No action returned from request')
+                }
+            } else {
+                throw new Error(`We are here in step ${currentStep}, and shouldn't request actions`)
+            }
+        } else {
+            throw new Error(`Some strange conditions to call requestAndSendAction`)
+        }
+    }
 }

@@ -1,12 +1,12 @@
-import CardInGame from 'moonlands/src/classes/CardInGame';
-import { State } from 'moonlands/src/index'
-import { ACTION_ATTACK, PROPERTY_ATTACKS_PER_TURN, ACTION_PASS, TYPE_CREATURE, ZONE_TYPE_ACTIVE_MAGI, ZONE_TYPE_IN_PLAY, PROMPT_TYPE_OWN_SINGLE_CREATURE, ACTION_RESOLVE_PROMPT, PROMPT_TYPE_MAY_ABILITY, PROMPT_TYPE_NUMBER, PROMPT_TYPE_SINGLE_CREATURE, PROMPT_TYPE_SINGLE_MAGI, ACTION_POWER, ZONE_TYPE_HAND, TYPE_SPELL, ACTION_PLAY, REGION_UNIVERSAL, PROMPT_TYPE_SINGLE_CREATURE_FILTERED, PROMPT_TYPE_SINGLE_CREATURE_OR_MAGI, ACTION_EFFECT, EFFECT_TYPE_CARD_MOVED_BETWEEN_ZONES, PROPERTY_CONTROLLER, PROPERTY_CAN_BE_ATTACKED, PROPERTY_ABLE_TO_ATTACK, PROMPT_TYPE_CHOOSE_UP_TO_N_CARDS_FROM_ZONE, PROMPT_TYPE_REARRANGE_ENERGY_ON_CREATURES, PROMPT_TYPE_DISTRIBUTE_ENERGY_ON_CREATURES } from '../const';
-import { ActionOnHold, SimulationEntity } from '../types';
-import { HashBuilder } from './HashBuilder';
-import { PROMPT_TYPE_ALTERNATIVE, PROMPT_TYPE_ANY_CREATURE_EXCEPT_SOURCE, PROMPT_TYPE_CHOOSE_N_CARDS_FROM_ZONE, PROMPT_TYPE_DISTRIBUTE_DAMAGE_ON_CREATURES, PROMPT_TYPE_MAGI_WITHOUT_CREATURES, PROMPT_TYPE_PAYMENT_SOURCE, PROMPT_TYPE_PLAYER, PROMPT_TYPE_POWER_ON_MAGI, PROMPT_TYPE_REARRANGE_CARDS_OF_ZONE, PROMPT_TYPE_RELIC, SELECTOR_CREATURES_OF_PLAYER, TYPE_RELIC } from 'moonlands/src/const';
-import { C2SAction } from '../../clientProtocol';
-import { AnyEffectType } from 'moonlands/src/types';
-import { ResolvePaymentSourcePrompt } from 'moonlands/src/types/resolvePrompt';
+import CardInGame from 'moonlands/dist/esm/classes/CardInGame.js';
+import { State } from 'moonlands/dist/esm/index.js'
+import { AnyEffectType } from 'moonlands/dist/esm/types/index.js';
+import { ResolvePaymentSourcePrompt } from 'moonlands/dist/esm/types/resolvePrompt.js';
+import { ACTION_ATTACK, PROPERTY_ATTACKS_PER_TURN, ACTION_PASS, TYPE_CREATURE, ZONE_TYPE_ACTIVE_MAGI, ZONE_TYPE_IN_PLAY, PROMPT_TYPE_OWN_SINGLE_CREATURE, ACTION_RESOLVE_PROMPT, PROMPT_TYPE_MAY_ABILITY, PROMPT_TYPE_NUMBER, PROMPT_TYPE_SINGLE_CREATURE, PROMPT_TYPE_SINGLE_MAGI, ACTION_POWER, ZONE_TYPE_HAND, TYPE_SPELL, ACTION_PLAY, REGION_UNIVERSAL, PROMPT_TYPE_SINGLE_CREATURE_FILTERED, PROMPT_TYPE_SINGLE_CREATURE_OR_MAGI, ACTION_EFFECT, EFFECT_TYPE_CARD_MOVED_BETWEEN_ZONES, PROPERTY_CONTROLLER, PROPERTY_CAN_BE_ATTACKED, PROPERTY_ABLE_TO_ATTACK, PROMPT_TYPE_CHOOSE_UP_TO_N_CARDS_FROM_ZONE, PROMPT_TYPE_REARRANGE_ENERGY_ON_CREATURES, PROMPT_TYPE_DISTRIBUTE_ENERGY_ON_CREATURES } from '../const.js';
+import { ActionOnHold, SimulationEntity } from '../types.js';
+import { HashBuilder } from './HashBuilder.js';
+import { PROMPT_TYPE_ALTERNATIVE, PROMPT_TYPE_ANY_CREATURE_EXCEPT_SOURCE, PROMPT_TYPE_CHOOSE_N_CARDS_FROM_ZONE, PROMPT_TYPE_DISTRIBUTE_DAMAGE_ON_CREATURES, PROMPT_TYPE_MAGI_WITHOUT_CREATURES, PROMPT_TYPE_PAYMENT_SOURCE, PROMPT_TYPE_PLAYER, PROMPT_TYPE_POWER_ON_MAGI, PROMPT_TYPE_REARRANGE_CARDS_OF_ZONE, PROMPT_TYPE_RELIC, SELECTOR_CREATURES_OF_PLAYER, TYPE_RELIC } from 'moonlands/dist/esm/const.js';
+import { C2SAction } from 'duel-protocol';
 
 const STEP_NAME = {
   ENERGIZE: 0,
@@ -190,7 +190,7 @@ export class ActionExtractor {
                   // action.sourceZone === ZONE_TYPE_HAND &&
                   // action.destinationZone === ZONE_TYPE_IN_PLAY
                 ) {
-                  hashBuilder.registerChildHash(action.sourceCard.id, action.destinationCard.id);
+                  hashBuilder.registerChildHash(action.sourceCard.id, action.destinationCard.id, action.sourceCard.card.name);
                 }
               });
               const card = innerSim.getZone(ZONE_TYPE_HAND, playerId).byId(creature.id)
@@ -318,7 +318,7 @@ export class ActionExtractor {
           const innerSim = sim.clone()
           const action: AnyEffectType = {
             type: ACTION_RESOLVE_PROMPT,
-            promptType: PROMPT_TYPE_OWN_SINGLE_CREATURE,
+            promptType: PROMPT_TYPE_SINGLE_CREATURE_FILTERED,
             target: innerSim.getZone(ZONE_TYPE_IN_PLAY).byId(creature.id),
             generatedBy: innerSim.state.promptGeneratedBy,
             player: innerSim.state.promptPlayer,
@@ -1016,10 +1016,15 @@ export class ActionExtractor {
 
   public static getAllAttackPatterns(sim: State, attacker: number, opponent: number): AttackPattern[] {
     const creatures = sim.getZone(ZONE_TYPE_IN_PLAY).cards.filter((card: CardInGame) => card.card.type === TYPE_CREATURE)
-    const attackers = creatures.filter((card: CardInGame) => sim.modifyByStaticAbilities(card, PROPERTY_CONTROLLER) === attacker && sim.modifyByStaticAbilities(card, PROPERTY_ABLE_TO_ATTACK) === true)
-    const defenders = creatures.filter((card: CardInGame) => sim.modifyByStaticAbilities(card, PROPERTY_CONTROLLER) !== attacker && sim.modifyByStaticAbilities(card, PROPERTY_CAN_BE_ATTACKED) === true)
+    // PROPERTY_CONTROLLER is queried 3Ã— per creature without caching
+    const controllerOf = new Map<string, number>()
+    for (const card of creatures) {
+      controllerOf.set(card.id, sim.modifyByStaticAbilities(card, PROPERTY_CONTROLLER) as number)
+    }
+    const attackers = creatures.filter((card: CardInGame) => controllerOf.get(card.id) === attacker && sim.modifyByStaticAbilities(card, PROPERTY_ABLE_TO_ATTACK) === true)
+    const defenders = creatures.filter((card: CardInGame) => controllerOf.get(card.id) !== attacker && sim.modifyByStaticAbilities(card, PROPERTY_CAN_BE_ATTACKED) === true)
 
-    const allOpponentCreatures = creatures.filter((card: CardInGame) => sim.modifyByStaticAbilities(card, PROPERTY_CONTROLLER) !== attacker)
+    const allOpponentCreatures = creatures.filter((card: CardInGame) => controllerOf.get(card.id) !== attacker)
 
     const enemyMagi = sim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponent).cards[0]
     const magiCanBeAttacked = sim.modifyByStaticAbilities(enemyMagi, PROPERTY_CAN_BE_ATTACKED)
