@@ -238,7 +238,7 @@ export class ReconSimulationStrategy implements Strategy {
             case 'TARGET': return this.resolveTargetPrompt(action.targetId)
             case 'NUMBER': return this.resolveNumberPrompt(action.number)
             case 'CARDS': return { type: ACTION_RESOLVE_PROMPT, zone: action.zone, zoneOwner: action.zoneOwner, cards: action.cardIds, player: this.playerId } as C2SAction
-            case 'CARDS_ORDER': return { type: ACTION_RESOLVE_PROMPT, cardsOrder: action.cardsOrder, generatedBy: this.gameState?.state.promptGeneratedBy || '', player: this.playerId } as C2SAction
+            case 'CARDS_ORDER': return { type: ACTION_RESOLVE_PROMPT, cards: action.cardsOrder, generatedBy: this.gameState?.state.promptGeneratedBy || '', player: this.playerId } as C2SAction
             case 'DAMAGE_MAP': return { type: ACTION_RESOLVE_PROMPT, damageOnCreatures: action.damageMap, generatedBy: this.gameState?.state.promptGeneratedBy || '', player: this.playerId } as C2SAction
             case 'ENERGY_MAP': return { type: ACTION_RESOLVE_PROMPT, energyOnCreatures: action.energyMap, generatedBy: this.gameState?.state.promptGeneratedBy || '', player: this.playerId } as C2SAction
             case 'PLAYER': return { type: ACTION_RESOLVE_PROMPT, targetPlayer: action.targetPlayer, player: this.playerId } as C2SAction
@@ -755,6 +755,14 @@ export class ReconSimulationStrategy implements Strategy {
                     const target = available?.[0] ?? oppMagi ?? myMagi
                     if (target) return this.resolveTargetPrompt(target.id)
                 }
+                if (promptType === PROMPT_TYPE_REARRANGE_CARDS_OF_ZONE) {
+                    const cards = this.gameState.state.promptParams.cards ?? this.gameState.state.promptAvailableCards ?? []
+                    return {
+                        type: ACTION_RESOLVE_PROMPT, promptType,
+                        cards: cards.map(card => card.id),
+                        generatedBy: this.gameState.state.promptGeneratedBy || '', player: this.playerId,
+                    } as C2SAction
+                }
                 if (promptType === PROMPT_TYPE_SINGLE_CREATURE_OR_MAGI) {
                     const available = this.gameState.state.promptAvailableCards as { id: string }[] | null
                     const target = available?.[0]
@@ -805,10 +813,10 @@ export class ReconSimulationStrategy implements Strategy {
                             ) {
                                 return this.resolveChooseCardsPrompt()
                             } else if (this.gameState.getPromptType() === PROMPT_TYPE_REARRANGE_CARDS_OF_ZONE) {
-                                const available = this.gameState.state.promptAvailableCards as { id: string }[]
+                                const available = this.gameState.state.promptParams.cards ?? this.gameState.state.promptAvailableCards ?? []
                                 return {
                                     type: ACTION_RESOLVE_PROMPT,
-                                    cardsOrder: available.map(c => c.id),
+                                    cards: available.map(c => c.id),
                                     generatedBy: this.gameState.state.promptGeneratedBy || '',
                                     player: this.playerId,
                                 } as C2SAction

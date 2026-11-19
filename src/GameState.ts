@@ -55,6 +55,7 @@ import {
   EFFECT_TYPE_ENERGY_DISCARDED_FROM_CREATURE,
   EFFECT_TYPE_ENERGY_DISCARDED_FROM_MAGI,
   PROMPT_TYPE_PAYMENT_SOURCE,
+  PROMPT_TYPE_REARRANGE_CARDS_OF_ZONE,
   EFFECT_TYPE_PROMPT_ENTERED,
 } from 'moonlands/dist/esm/const.js'
 import { getCardDetails } from './common.js'
@@ -800,6 +801,16 @@ export class GameState {
           case PROMPT_TYPE_PAYMENT_SOURCE: {
             promptParams = {
               cards: action.promptParams.cards,
+            };
+            break;
+          }
+          case PROMPT_TYPE_REARRANGE_CARDS_OF_ZONE: {
+            promptParams = {
+              zone: action.promptParams.zone,
+              zoneOwner: action.promptParams.zoneOwner,
+              numberOfCards: action.promptParams.numberOfCards,
+              // Protocol 0.1.0 sends cards but omitted them from this declaration.
+              cards: 'cards' in action.promptParams ? action.promptParams.cards as ConvertedCard[] : [],
             };
             break;
           }

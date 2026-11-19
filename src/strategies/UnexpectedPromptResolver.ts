@@ -15,6 +15,7 @@ import {
     PROMPT_TYPE_PAYMENT_SOURCE,
     PROMPT_TYPE_ALTERNATIVE,
     PROMPT_TYPE_POWER_ON_MAGI,
+    PROMPT_TYPE_REARRANGE_CARDS_OF_ZONE,
     PROMPT_TYPE_REARRANGE_ENERGY_ON_CREATURES,
     PROMPT_TYPE_DISTRIBUTE_ENERGY_ON_CREATURES,
     PROMPT_TYPE_DISTRIBUTE_DAMAGE_ON_CREATURES,
@@ -130,6 +131,16 @@ class UnexpectedPromptResolver  {
                     if (power) return { type: ACTION_RESOLVE_PROMPT, promptType, power, player } as any;
                 }
                 break;
+            }
+
+            case PROMPT_TYPE_REARRANGE_CARDS_OF_ZONE: {
+                const params = state.state.promptParams;
+                const cards = params.cards ?? state.state.promptAvailableCards ?? [];
+                return {
+                    type: ACTION_RESOLVE_PROMPT, promptType,
+                    cards: cards.map((card: any) => typeof card === 'string' ? card : card.id),
+                    generatedBy: state.state.promptGeneratedBy || '', player,
+                } as any;
             }
 
             case PROMPT_TYPE_REARRANGE_ENERGY_ON_CREATURES: {

@@ -1,6 +1,21 @@
 import {State} from 'moonlands/dist/esm/index.js'
 import {PROPERTY_ATTACKS_PER_TURN, TYPE_CREATURE, ZONE_TYPE_ACTIVE_MAGI, ZONE_TYPE_HAND, ZONE_TYPE_IN_PLAY} from "../const.js"
 
+// Match prompt semantics across engine states and reconstructed client states.
+// Cards may have hidden/placeholder definitions in search; their IDs identify
+// the available choices. Preserve array order and canonicalize object keys.
+function promptValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(promptValue)
+  if (value && typeof value === 'object') {
+    if ('id' in value && typeof value.id === 'string') return value.id
+    const object = value as Record<string, unknown>
+    return Object.fromEntries(Object.keys(object).sort()
+      .filter(key => object[key] !== undefined)
+      .map(key => [key, promptValue(object[key])]))
+  }
+  return value
+}
+
 export class HashBuilder {
   private ids = new Map<string, number>()
   private comesFrom = new Map<string, string>()
@@ -36,7 +51,11 @@ export class HashBuilder {
     const enemyMagi = sim.getZone(ZONE_TYPE_ACTIVE_MAGI, sim.players[1]).card
     const enemyMagiHash = enemyMagi ? `@${enemyMagi.data.energy}` : 'X'
 
-    return (sim.state.activePlayer === sim.players[0] ? '*' : 'v') + sim.state.step?.toString() + '{' + handHashes.join(',') + '}' + ourMagiHash + '|' + cardHashes.join('|') + '|' + enemyMagiHash + (sim.state.prompt ? `?${sim.state.promptPlayer}:` + this.convertHash(sim.state.promptGeneratedBy || '') + `[${sim.state.promptGeneratedBy}]` : '')
+    const promptHash = sim.state.prompt
+      ? `?${sim.state.promptPlayer}:` + this.convertHash(sim.state.promptGeneratedBy || '') + `[${sim.state.promptGeneratedBy}]` +
+        JSON.stringify({ type: sim.state.promptType, params: promptValue(sim.state.promptParams) })
+      : ''
+    return (sim.state.activePlayer === sim.players[0] ? '*' : 'v') + sim.state.step?.toString() + '{' + handHashes.join(',') + '}' + ourMagiHash + '|' + cardHashes.join('|') + '|' + enemyMagiHash + promptHash
   }
 
   private convertHash(hash: string): number {

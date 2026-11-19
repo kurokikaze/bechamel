@@ -1,6 +1,7 @@
 import CardInGame from 'moonlands/dist/esm/classes/CardInGame.js';
 import { State } from 'moonlands/dist/esm/index.js';
 import { AnyEffectType } from 'moonlands/dist/esm/types/index.js';
+import { rearrangeCardsAction } from './rearrangeCardsAction.js';
 import {
     ACTION_ATTACK,
     ACTION_PASS,
@@ -253,12 +254,7 @@ export class DirectActionExtractor {
             }
 
             case 'CARDS_ORDER': {
-                sim.update({
-                    type: ACTION_RESOLVE_PROMPT,
-                    cardsOrder: action.cardsOrder,
-                    generatedBy: promptGeneratedBy,
-                    player: promptPlayer,
-                } as AnyEffectType)
+                sim.update(rearrangeCardsAction(action.cardsOrder, promptGeneratedBy, promptPlayer))
                 break
             }
 

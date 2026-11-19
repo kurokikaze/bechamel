@@ -196,6 +196,15 @@ export class SimulationStrategy implements Strategy {
                 break;
             }
             case ACTION_RESOLVE_PROMPT: {
+                if ('promptType' in simAction && simAction.promptType === PROMPT_TYPE_REARRANGE_CARDS_OF_ZONE && 'cards' in simAction) {
+                    return {
+                        type: ACTION_RESOLVE_PROMPT,
+                        promptType: PROMPT_TYPE_REARRANGE_CARDS_OF_ZONE,
+                        cards: simAction.cards,
+                        generatedBy: simAction.generatedBy,
+                        player: this.playerId,
+                    } as C2SAction
+                }
                 if ('target' in simAction && simAction.target && simAction.target instanceof CardInGame) {
                     // console.log(`SimAction path`)
                     return this.resolveTargetPrompt(simAction.target.id, simAction.target.card.name)
@@ -743,10 +752,10 @@ export class SimulationStrategy implements Strategy {
                             ) {
                                 return this.resolveChooseCardsPrompt()
                             } else if (this.gameState.getPromptType() === PROMPT_TYPE_REARRANGE_CARDS_OF_ZONE) {
-                                const available = this.gameState.state.promptAvailableCards as { id: string }[]
+                                const available = this.gameState.state.promptParams.cards ?? this.gameState.state.promptAvailableCards ?? []
                                 return {
                                     type: ACTION_RESOLVE_PROMPT,
-                                    cardsOrder: available.map(c => c.id),
+                                    cards: available.map(c => c.id),
                                     generatedBy: this.gameState.state.promptGeneratedBy || '',
                                     player: this.playerId,
                                 } as C2SAction

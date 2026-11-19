@@ -7,6 +7,7 @@ import { ActionOnHold, SimulationEntity } from '../types.js';
 import { HashBuilder } from './HashBuilder.js';
 import { PROMPT_TYPE_ALTERNATIVE, PROMPT_TYPE_ANY_CREATURE_EXCEPT_SOURCE, PROMPT_TYPE_CHOOSE_N_CARDS_FROM_ZONE, PROMPT_TYPE_DISTRIBUTE_DAMAGE_ON_CREATURES, PROMPT_TYPE_MAGI_WITHOUT_CREATURES, PROMPT_TYPE_PAYMENT_SOURCE, PROMPT_TYPE_PLAYER, PROMPT_TYPE_POWER_ON_MAGI, PROMPT_TYPE_REARRANGE_CARDS_OF_ZONE, PROMPT_TYPE_RELIC, SELECTOR_CREATURES_OF_PLAYER, TYPE_RELIC } from 'moonlands/dist/esm/const.js';
 import { C2SAction } from 'duel-protocol';
+import { rearrangeCardsAction } from './rearrangeCardsAction.js';
 
 const STEP_NAME = {
   ENERGIZE: 0,
@@ -574,13 +575,11 @@ export class ActionExtractor {
         const simulationQueue: SimulationEntity[] = []
 
         const innerSim = sim.clone()
-        const action: AnyEffectType = {
-          type: ACTION_RESOLVE_PROMPT,
-          // promptType: PROMPT_TYPE_REARRANGE_CARDS_OF_ZONE,
-          cardsOrder: innerSim.state.promptParams?.cards?.map(({ id }) => id) || [],
-          generatedBy: innerSim.state.promptGeneratedBy,
-          player: innerSim.state.promptPlayer as number,
-        }
+        const action = rearrangeCardsAction(
+          innerSim.state.promptParams?.cards?.map(({ id }) => id) || [],
+          innerSim.state.promptGeneratedBy,
+          innerSim.state.promptPlayer as number,
+        )
         simulationQueue.push(
           {
             sim: innerSim,
