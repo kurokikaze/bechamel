@@ -375,7 +375,7 @@ export class DirectActionExtractor {
     }
 
     private static extractAttackActions(sim: State, playerId: number, opponentId: number): DirectAction[] {
-        const actions: DirectAction[] = [{ type: 'PASS' }]
+        const actions: DirectAction[] = ActionExtractor.canPassAttackStep(sim, playerId) ? [{ type: 'PASS' }] : []
 
         ActionExtractor.getAllAttackPatterns(sim, playerId, opponentId).forEach(pattern => {
             const source = sim.getZone(ZONE_TYPE_IN_PLAY).byId(pattern.from)

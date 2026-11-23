@@ -347,6 +347,7 @@ export class GameState {
     serverZoneType: string,
     source: Card | ConvertedCard | HiddenConvertedCard
   ): keyof typeof this.state.zones => {
+    if (serverZoneType === 'zones/set_aside') return 'setAside';
     if (!(serverZoneType in clientZoneNames)) {
       throw new Error(`Unknown zone: ${serverZoneType}`);
     }
@@ -534,7 +535,7 @@ export class GameState {
           });
         }
 
-        if (!(state.zones[sourceZone]) || !(destinationZone in state.zones)) {
+        if (!state.zones[sourceZone] || (destinationZone !== 'setAside' && !(destinationZone in state.zones))) {
           return state
         }
 
@@ -546,7 +547,7 @@ export class GameState {
           zones: {
             ...state.zones,
             [sourceZone]: sourceZoneContent.filter((card: { id: string }): boolean => card.id !== action.sourceCard.id),
-            [destinationZone]: [...state.zones[destinationZone], action.destinationCard],
+            [destinationZone]: [...(state.zones[destinationZone] ?? []), action.destinationCard],
           },
         };
       }

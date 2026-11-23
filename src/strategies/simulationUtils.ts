@@ -114,6 +114,17 @@ export function createState(
     log: [],
   })
   sim.setPlayers(playerId, opponentId)
+  const setAside = gameState.state.zones.setAside;
+  if (setAside?.length) {
+    sim.getZone('zones/set_aside' as Parameters<State['getZone']>[0]).add(setAside.flatMap(card => {
+      const definition = byName(card.card);
+      if (!definition) return [];
+      const instance = new CardInGame(definition, card.owner);
+      instance.id = card.id;
+      instance.data = { ...card.data, actionsUsed: [...card.data.actionsUsed] };
+      return [instance];
+    }));
+  }
 
   const myMagiActualCard = byName(myMagi?.card)
   if (myMagi && myMagiActualCard) {

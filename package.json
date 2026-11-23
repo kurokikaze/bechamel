@@ -1,6 +1,6 @@
 {
   "name": "bechamel",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Magi-Nation Duel bot",
   "license": "MIT",
   "type": "module",
@@ -23,15 +23,15 @@
     "sim:harness": "node dist/tests/simulationHarness.js"
   },
   "peerDependencies": {
-    "moonlands": ">=0.41.0 <0.42.0"
+    "moonlands": ">=0.42.0 <0.43.0"
   },
   "dependencies": {
-    "duel-protocol": "https://github.com/kurokikaze/duel-protocol/releases/download/0.3.1/duel-protocol-0.3.1.tgz",
+    "duel-protocol": "https://github.com/kurokikaze/duel-protocol/releases/download/0.3.2/duel-protocol-0.3.2.tgz",
     "socket.io-client": "^4.8.1",
     "isomorphic-fetch": "^3.0.0"
   },
   "devDependencies": {
-    "moonlands": "https://github.com/kurokikaze/moonlands/archive/refs/tags/v0.41.0.tar.gz",
+    "moonlands": "https://github.com/kurokikaze/moonlands/archive/refs/tags/v0.42.0.tar.gz",
     "typescript": "^5.7.2",
     "@types/node": "^18.7.10",
     "@types/jest": "^30.0.0",

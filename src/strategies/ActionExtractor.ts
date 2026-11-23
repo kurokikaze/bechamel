@@ -142,7 +142,8 @@ export class ActionExtractor {
       case STEP_NAME.ATTACK: {
         const attackPatterns = ActionExtractor.getAllAttackPatterns(sim, playerId, opponentId)
 
-        const workEntities: SimulationEntity[] = [ActionExtractor.getPassAction(sim, playerId, actionLog, previousHash)]
+        const workEntities: SimulationEntity[] = ActionExtractor.canPassAttackStep(sim, playerId)
+          ? [ActionExtractor.getPassAction(sim, playerId, actionLog, previousHash)] : []
         attackPatterns.forEach(pattern => {
           const innerSim = sim.clone()
           const source = innerSim.getZone(ZONE_TYPE_IN_PLAY).byId(pattern.from)
@@ -1014,6 +1015,11 @@ export class ActionExtractor {
         return []
       }
     }
+  }
+
+  public static canPassAttackStep(sim: State, player: number): boolean {
+    const engine = sim as State & { hasRequiredAttack?: (player: number) => boolean };
+    return !engine.hasRequiredAttack?.(player);
   }
 
   public static getAllAttackPatterns(sim: State, attacker: number, opponent: number): AttackPattern[] {
