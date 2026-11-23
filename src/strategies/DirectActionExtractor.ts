@@ -94,6 +94,21 @@ const STEP_NAME = {
 
 const FORBIDDEN_SPELLS = ["Hyren's Call"]
 
+const BENEFICIAL_SPELLS = ['Spirit of the Flame', 'Fog Bank']
+const HARMFUL_SPELLS = ['Implosion', 'Thermal Blast', 'Ground Breaker', 'Bottomless Pit']
+const BENEFICIAL_POWERS = ['Vitalize', 'Healing Light', 'Nourish']
+const HARMFUL_POWERS = ['Final Blow', 'Shatterwave', 'Pound Pound Pound', 'Mind Burn', 'Mind Shock', 'Snuff Out', 'Stab', 'Thunderclap', 'Posess', 'Fireball']
+
+type TargetSide = 'own' | 'opponent'
+
+function getTargetSide(cardName: string | undefined, powerName?: string): TargetSide | undefined {
+    if (powerName && HARMFUL_POWERS.includes(powerName)) return 'opponent'
+    if (powerName && BENEFICIAL_POWERS.includes(powerName)) return 'own'
+    if (cardName && HARMFUL_SPELLS.includes(cardName)) return 'opponent'
+    if (cardName && BENEFICIAL_SPELLS.includes(cardName)) return 'own'
+    return undefined
+}
+
 export class DirectActionExtractor {
 
     // -----------------------------------------------------------------------
@@ -220,7 +235,7 @@ export class DirectActionExtractor {
 
             case 'CARDS': {
                 const cards = action.cardIds
-                    .map(id => sim.getZone(action.zone as any, action.zoneOwner).byId(id))
+                    .map(id => sim.getZone(action.zone as any, action.zone === ZONE_TYPE_IN_PLAY ? null : action.zoneOwner).byId(id))
                     .filter(Boolean) as CardInGame[]
                 sim.update({
                     type: ACTION_RESOLVE_PROMPT,
@@ -413,28 +428,56 @@ export class DirectActionExtractor {
         const promptEffect = effects.find((e: any) => e.type === 'actions/enter_prompt')
         if (!promptEffect) return true
 
+        const targetSide = getTargetSide(spell.card.name)
+        const targetController = targetSide === 'own' ? playerId : targetSide === 'opponent' ? sim.getOpponent(playerId) : undefined
+        const hasEligibleCreature = inPlay.some(c =>
+            c.card.type === TYPE_CREATURE &&
+            (targetController === undefined || sim.modifyByStaticAbilities(c, PROPERTY_CONTROLLER) === targetController)
+        )
         const { promptType, promptParams } = promptEffect
         if (promptType === 'prompt/creature') {
-            return inPlay.some(c => c.card.type === TYPE_CREATURE)
+            return hasEligibleCreature
         }
         if (promptType === 'prompt/own_creature') {
             // own_creature only accepts own creatures - must check controller, not just type
             return inPlay.some(c => c.card.type === TYPE_CREATURE &&
+                (targetController === undefined || sim.modifyByStaticAbilities(c, PROPERTY_CONTROLLER) === targetController) &&
                 sim.modifyByStaticAbilities(c, PROPERTY_CONTROLLER) === playerId)
         }
         if (promptType === 'prompt/creature_filtered') {
             const restriction = promptParams?.restriction
             const value = promptParams?.restrictionValue
             if (restriction === 'restrictions/region') {
-                return inPlay.some(c => c.card.type === TYPE_CREATURE && (c.card as any).region === value)
+                return inPlay.some(c => c.card.type === TYPE_CREATURE &&
+                    (targetController === undefined || sim.modifyByStaticAbilities(c, PROPERTY_CONTROLLER) === targetController) &&
+                    (c.card as any).region === value)
             }
             if (restriction === 'restrictions/type') {
                 return inPlay.some(c => c.card.type === TYPE_CREATURE &&
+                    (targetController === undefined || sim.modifyByStaticAbilities(c, PROPERTY_CONTROLLER) === targetController) &&
                     ((c.card.data as any)?.types ?? []).includes(value))
             }
-            return inPlay.some(c => c.card.type === TYPE_CREATURE)
+            return hasEligibleCreature
         }
         return true
+    }
+
+    /** Apply the configured own/opponent targeting policy for a resolving spell or power. */
+    private static filterTargets(
+        sim: State,
+        cards: CardInGame[],
+        playerId: number,
+        opponentId: number,
+        defaultController?: number,
+    ): CardInGame[] {
+        const generatedBy = sim.state.promptGeneratedBy ?? ''
+        const metadata = (sim.state as any).spellMetaData?.[generatedBy]
+        const source = metadata?.source as CardInGame | undefined
+        const targetSide = getTargetSide(source?.card?.name, metadata?.sourcePower?.name)
+        if (!targetSide && defaultController === undefined) return cards
+
+        const targetController = targetSide === 'own' ? playerId : targetSide === 'opponent' ? opponentId : defaultController!
+        return cards.filter(card => sim.modifyByStaticAbilities(card, PROPERTY_CONTROLLER) === targetController)
     }
 
     private static extractPromptActions(sim: State, playerId: number, opponentId: number): DirectAction[] {
@@ -482,6 +525,7 @@ export class DirectActionExtractor {
                 } else {
                     filtered = all
                 }
+                filtered = DirectActionExtractor.filterTargets(sim, filtered, playerId, opponentId)
                 return filtered.map(c => ({
                     type: 'TARGET' as const,
                     targetId: c.id,
@@ -490,8 +534,9 @@ export class DirectActionExtractor {
             }
 
             case PROMPT_TYPE_SINGLE_CREATURE: {
-                return (sim.getZone(ZONE_TYPE_IN_PLAY).cards as CardInGame[])
-                    .filter(c => c.card.type === TYPE_CREATURE)
+                return DirectActionExtractor.filterTargets(sim,
+                    (sim.getZone(ZONE_TYPE_IN_PLAY).cards as CardInGame[]).filter(c => c.card.type === TYPE_CREATURE),
+                    playerId, opponentId)
                     .map(c => ({
                         type: 'TARGET' as const,
                         targetId: c.id,
@@ -500,8 +545,9 @@ export class DirectActionExtractor {
             }
 
             case PROMPT_TYPE_SINGLE_CREATURE_OR_MAGI: {
-                const actions: DirectAction[] = (sim.getZone(ZONE_TYPE_IN_PLAY).cards as CardInGame[])
-                    .filter(c => c.card.type === TYPE_CREATURE)
+                const actions: DirectAction[] = DirectActionExtractor.filterTargets(sim,
+                    (sim.getZone(ZONE_TYPE_IN_PLAY).cards as CardInGame[]).filter(c => c.card.type === TYPE_CREATURE),
+                    playerId, opponentId)
                     .map(c => ({
                         type: 'TARGET' as const,
                         targetId: c.id,
@@ -509,14 +555,16 @@ export class DirectActionExtractor {
                     }))
                 const myMagi  = sim.getZone(ZONE_TYPE_ACTIVE_MAGI, playerId).card
                 const oppMagi = sim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponentId).card
-                if (myMagi)  actions.push({ type: 'TARGET', targetId: myMagi.id,  label: `Choose ${myMagi.card.name}`  })
-                if (oppMagi) actions.push({ type: 'TARGET', targetId: oppMagi.id, label: `Choose ${oppMagi.card.name}` })
+                DirectActionExtractor.filterTargets(sim,
+                    [myMagi, oppMagi].filter((magi): magi is CardInGame => !!magi), playerId, opponentId)
+                    .forEach(magi => actions.push({ type: 'TARGET', targetId: magi.id, label: `Choose ${magi.card.name}` }))
                 return actions
             }
 
             case PROMPT_TYPE_RELIC: {
-                return (sim.getZone(ZONE_TYPE_IN_PLAY).cards as CardInGame[])
-                    .filter(c => c.card.type === TYPE_RELIC)
+                return DirectActionExtractor.filterTargets(sim,
+                    (sim.getZone(ZONE_TYPE_IN_PLAY).cards as CardInGame[]).filter(c => c.card.type === TYPE_RELIC),
+                    playerId, opponentId)
                     .map(r => ({
                         type: 'TARGET' as const,
                         targetId: r.id,
@@ -525,8 +573,10 @@ export class DirectActionExtractor {
             }
 
             case PROMPT_TYPE_ANY_CREATURE_EXCEPT_SOURCE: {
-                return (sim.getZone(ZONE_TYPE_IN_PLAY).cards as CardInGame[])
-                    .filter(c => c.card.type === TYPE_CREATURE && c.id !== sim.state.promptGeneratedBy)
+                return DirectActionExtractor.filterTargets(sim,
+                    (sim.getZone(ZONE_TYPE_IN_PLAY).cards as CardInGame[])
+                        .filter(c => c.card.type === TYPE_CREATURE && c.id !== sim.state.promptGeneratedBy),
+                    playerId, opponentId)
                     .map(c => ({
                         type: 'TARGET' as const,
                         targetId: c.id,
@@ -551,6 +601,7 @@ export class DirectActionExtractor {
                         c.card.type === TYPE_CREATURE &&
                         sim.modifyByStaticAbilities(c, PROPERTY_CONTROLLER) === promptPlayer
                     )
+                    .filter(c => DirectActionExtractor.filterTargets(sim, [c], playerId, opponentId).length > 0)
                     .map(c => ({
                         type: 'TARGET' as const,
                         targetId: c.id,
@@ -562,8 +613,9 @@ export class DirectActionExtractor {
                 const actions: DirectAction[] = []
                 const myMagi  = sim.getZone(ZONE_TYPE_ACTIVE_MAGI, playerId).card
                 const oppMagi = sim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponentId).card
-                if (myMagi)  actions.push({ type: 'TARGET', targetId: myMagi.id,  label: `Choose ${myMagi.card.name}`  })
-                if (oppMagi) actions.push({ type: 'TARGET', targetId: oppMagi.id, label: `Choose ${oppMagi.card.name}` })
+                DirectActionExtractor.filterTargets(sim,
+                    [myMagi, oppMagi].filter((magi): magi is CardInGame => !!magi), playerId, opponentId)
+                    .forEach(magi => actions.push({ type: 'TARGET', targetId: magi.id, label: `Choose ${magi.card.name}` }))
                 return actions
             }
 
@@ -573,8 +625,12 @@ export class DirectActionExtractor {
                 const oppMagi = sim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponentId).card
                 const iHaveCreatures  = sim.useSelector(SELECTOR_CREATURES_OF_PLAYER, playerId).length > 0
                 const oppHasCreatures = sim.useSelector(SELECTOR_CREATURES_OF_PLAYER, opponentId).length > 0
-                if (myMagi  && !iHaveCreatures)  actions.push({ type: 'TARGET', targetId: myMagi.id,  label: `Choose ${myMagi.card.name}`  })
-                if (oppMagi && !oppHasCreatures) actions.push({ type: 'TARGET', targetId: oppMagi.id, label: `Choose ${oppMagi.card.name}` })
+                const eligibleMagi = DirectActionExtractor.filterTargets(sim,
+                    [
+                        myMagi && !iHaveCreatures ? myMagi : null,
+                        oppMagi && !oppHasCreatures ? oppMagi : null,
+                    ].filter((magi): magi is CardInGame => !!magi), playerId, opponentId)
+                eligibleMagi.forEach(magi => actions.push({ type: 'TARGET', targetId: magi.id, label: `Choose ${magi.card.name}` }))
                 return actions
             }
 
@@ -598,8 +654,10 @@ export class DirectActionExtractor {
             }
 
             case PROMPT_TYPE_DISTRIBUTE_DAMAGE_ON_CREATURES: {
-                const enemies = (sim.getZone(ZONE_TYPE_IN_PLAY).cards as CardInGame[])
-                    .filter(c => c.card.type === TYPE_CREATURE && sim.modifyByStaticAbilities(c, PROPERTY_CONTROLLER) === opponentId)
+                const enemies = DirectActionExtractor.filterTargets(sim,
+                    (sim.getZone(ZONE_TYPE_IN_PLAY).cards as CardInGame[])
+                        .filter(c => c.card.type === TYPE_CREATURE),
+                    playerId, opponentId, opponentId)
                     .map(c => [c.id, c.data.energy] as [string, number])
                     .sort((a, b) => a[1] - b[1])
 
@@ -622,8 +680,10 @@ export class DirectActionExtractor {
             }
 
             case PROMPT_TYPE_DISTRIBUTE_ENERGY_ON_CREATURES: {
-                const allies = (sim.getZone(ZONE_TYPE_IN_PLAY).cards as CardInGame[])
-                    .filter(c => c.card.type === TYPE_CREATURE && sim.modifyByStaticAbilities(c, PROPERTY_CONTROLLER) === playerId)
+                const allies = DirectActionExtractor.filterTargets(sim,
+                    (sim.getZone(ZONE_TYPE_IN_PLAY).cards as CardInGame[])
+                        .filter(c => c.card.type === TYPE_CREATURE),
+                    playerId, opponentId, playerId)
                     .map(c => [c.id, c.data.energy] as [string, number])
                     .sort((a, b) => a[1] - b[1])
 
@@ -647,8 +707,10 @@ export class DirectActionExtractor {
 
             case PROMPT_TYPE_REARRANGE_ENERGY_ON_CREATURES: {
                 const energyMap = Object.fromEntries(
-                    (sim.getZone(ZONE_TYPE_IN_PLAY).cards as CardInGame[])
-                        .filter(c => c.card.type === TYPE_CREATURE && sim.modifyByStaticAbilities(c, PROPERTY_CONTROLLER) === playerId)
+                    DirectActionExtractor.filterTargets(sim,
+                        (sim.getZone(ZONE_TYPE_IN_PLAY).cards as CardInGame[])
+                            .filter(c => c.card.type === TYPE_CREATURE),
+                        playerId, opponentId, playerId)
                         .map(c => [c.id, c.data.energy])
                 )
                 return [{ type: 'ENERGY_MAP', energyMap, label: 'Rearrange energy (keep distribution)' }]
@@ -658,7 +720,8 @@ export class DirectActionExtractor {
                 if (!sim.state.promptParams.zone) return []
                 const zone = sim.state.promptParams.zone
                 const zoneOwner = sim.state.promptParams.zoneOwner ?? 0
-                const zoneCards = sim.getZone(zone as any, zoneOwner).cards as CardInGame[]
+                const zoneCards = DirectActionExtractor.filterTargets(
+                    sim, sim.getZone(zone as any, zoneOwner).cards as CardInGame[], playerId, opponentId)
                 const n = sim.state.promptParams.numberOfCards ?? 1
                 const variants = Math.floor(zoneCards.length / n)
                 const actions: DirectAction[] = []
@@ -679,11 +742,17 @@ export class DirectActionExtractor {
                 if (!sim.state.promptParams.zone) return []
                 const zone = sim.state.promptParams.zone
                 const zoneOwner = sim.state.promptParams.zoneOwner ?? 0
-                const zoneCards = sim.getZone(zone as any, zoneOwner).cards as CardInGame[]
+                const owner = zone === ZONE_TYPE_IN_PLAY ? null : zoneOwner
+                const eligible = sim.state.promptParams.cards
+                const zoneCards = DirectActionExtractor.filterTargets(
+                    sim, sim.getZone(zone as any, owner).cards as CardInGame[], playerId, opponentId)
+                    .filter(card => !eligible || eligible.some(choice => choice.id === card.id))
                 const n = sim.state.promptParams.numberOfCards ?? 1
                 const actions: DirectAction[] = []
-                for (let i = 0; i < Math.min(n, zoneCards.length); i++) {
-                    const slice = zoneCards.slice(0, i)
+                const selections = n === 1
+                    ? [[], ...zoneCards.map(card => [card])]
+                    : Array.from({ length: Math.min(n, zoneCards.length) + 1 }, (_, size) => zoneCards.slice(0, size))
+                for (const slice of selections) {
                     actions.push({
                         type: 'CARDS',
                         cardIds: slice.map(c => c.id),

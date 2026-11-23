@@ -946,22 +946,25 @@ export class ActionExtractor {
       }
       case PROMPT_TYPE_CHOOSE_UP_TO_N_CARDS_FROM_ZONE: {
         const simulationQueue: SimulationEntity[] = []
-        if (sim.state.promptParams.zone) {
-          const zoneCards = sim.getZone(sim.state.promptParams.zone, sim.state.promptParams.zoneOwner).cards;
-          // console.log('PROMPT_TYPE_CHOOSE_UP_TO_N_CARDS_FROM_ZONE')
-          const promptCards = (sim.state.promptParams.numberOfCards || 1)
-          // const numberOfVariants = Math.floor(zoneCards.length / promptCards)
-          const upperBound = Math.min(promptCards, zoneCards.length)
-          for (let i = 0; i < upperBound; i++) {
+        const { zone, zoneOwner, cards: eligible, numberOfCards = 1 } = sim.state.promptParams;
+        if (zone) {
+          const owner = zone === ZONE_TYPE_IN_PLAY ? null : zoneOwner;
+          const candidates = sim.getZone(zone, owner).cards.filter(card => !eligible || eligible.some(choice => choice.id === card.id));
+          const selections = numberOfCards === 1
+            ? [[], ...candidates.map(card => [card])]
+            : Array.from({ length: Math.min(numberOfCards, candidates.length) + 1 }, (_, size) => candidates.slice(0, size));
+          for (const selection of selections) {
             const innerSim = sim.clone()
-            const cards = innerSim.getZone(sim.state.promptParams.zone, sim.state.promptParams.zoneOwner).cards.slice(0, i);
+            const cards = selection.map(card => innerSim.getZone(zone, owner).byId(card.id));
             const action: AnyEffectType = {
               type: ACTION_RESOLVE_PROMPT,
-              // promptType: PROMPT_TYPE_CHOOSE_N_CARDS_FROM_ZONE,
+              promptType: PROMPT_TYPE_CHOOSE_UP_TO_N_CARDS_FROM_ZONE,
               cards: cards,
+              zone: innerSim.state.promptParams.zone,
+              zoneOwner: innerSim.state.promptParams.zoneOwner,
               generatedBy: innerSim.state.promptGeneratedBy,
               player: innerSim.state.promptPlayer as number,
-            }
+            } as AnyEffectType
             simulationQueue.push({
               sim: innerSim,
               action,

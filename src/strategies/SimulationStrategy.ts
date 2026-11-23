@@ -213,8 +213,9 @@ export class SimulationStrategy implements Strategy {
                     return this.resolveNumberPrompt(simAction.number)
                 }
                 if ('cards' in simAction && simAction.cards instanceof Array) {
+                    const promptType = 'promptType' in simAction && typeof simAction.promptType === 'string' ? simAction.promptType : '';
                     // @ts-ignore
-                    return this.resolveCardsPrompt(simAction.cards, '', simAction.zone, simAction.zoneOwner);
+                    return this.resolveCardsPrompt(simAction.cards, promptType, simAction.zone, simAction.zoneOwner);
                 }
                 console.error('No transformer for ACTION_RESOLVE_PROMPT action')
                 console.dir(simAction)

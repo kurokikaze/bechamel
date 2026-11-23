@@ -23,15 +23,15 @@
     "sim:harness": "node dist/tests/simulationHarness.js"
   },
   "peerDependencies": {
-    "moonlands": ">=0.40.2 <0.41.0"
+    "moonlands": ">=0.41.0 <0.42.0"
   },
   "dependencies": {
-    "duel-protocol": "https://github.com/kurokikaze/duel-protocol/releases/download/0.2.0/duel-protocol-0.2.0.tgz",
+    "duel-protocol": "https://github.com/kurokikaze/duel-protocol/releases/download/0.3.1/duel-protocol-0.3.1.tgz",
     "socket.io-client": "^4.8.1",
     "isomorphic-fetch": "^3.0.0"
   },
   "devDependencies": {
-    "moonlands": "https://github.com/kurokikaze/moonlands/archive/refs/tags/v0.40.2.tar.gz",
+    "moonlands": "https://github.com/kurokikaze/moonlands/archive/refs/tags/v0.41.0.tar.gz",
     "typescript": "^5.7.2",
     "@types/node": "^18.7.10",
     "@types/jest": "^30.0.0",

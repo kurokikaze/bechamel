@@ -561,7 +561,7 @@ export class GameState {
               playerActiveMagi: state.zones.playerActiveMagi.map(card => ({ ...card, data: { ...card.data, wasAttacked: false, actionsUsed: [] } })),
             },
             activePlayer: action.player,
-            continuousEffects: tickDownContinuousEffects(state.continuousEffects, false),
+            continuousEffects: tickDownContinuousEffects(state.continuousEffects, false, action.player),
           };
         } else {
           return {
@@ -572,7 +572,7 @@ export class GameState {
               opponentActiveMagi: state.zones.opponentActiveMagi.map(card => ({ ...card, data: { ...card.data, wasAttacked: false, actionsUsed: [] } })),
             },
             activePlayer: action.player,
-            continuousEffects: tickDownContinuousEffects(state.continuousEffects, true),
+            continuousEffects: tickDownContinuousEffects(state.continuousEffects, true, action.player),
           };
         }
       }
@@ -721,6 +721,7 @@ export class GameState {
             {
               generatedBy: action.generatedBy,
               expiration: action.expiration,
+              ...('discardSourceId' in action && typeof action.discardSourceId === 'string' && { discardSourceId: action.discardSourceId }),
               staticAbilities: action.staticAbilities || [],
               triggerEffects: action.triggerEffects || [],
               player: action.player,

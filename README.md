@@ -54,6 +54,11 @@ npm run build
 npm run sim:harness -- --runs=1 --baseSeed=2053
 ```
 
+The legacy harness also accepts `--writeLogs=true` and, with `--strategy=recon`,
+`--writeExtractionHashes=true`. Replay snapshots and ordered extraction hash pairs
+are written under `--outputDir` (default `stateDumps`), including partial output
+when a run fails or reaches its iteration limit.
+
 The harness writes summaries into `stateDumps/`. Its configuration and accepted
 options are in `src/tests/simulationHarness.ts`. Use `bechamel/simulation` for
 legacy programmatic execution. The sibling [triage server](../triage/README.md)

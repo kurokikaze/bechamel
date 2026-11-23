@@ -92,10 +92,10 @@ class UnexpectedPromptResolver  {
             case PROMPT_TYPE_CHOOSE_UP_TO_N_CARDS_FROM_ZONE: {
                 const params = (state as any).state?.promptParams || {};
                 const zoneCards = params.cards || (state as any).state?.promptAvailableCards || [];
-                const numberOfCards = params.numberOfCards || 1;
+                const numberOfCards = params.numberOfCards ?? 1;
                 const ids = zoneCards.map((c: any) => c.id || c).filter(Boolean);
                 const chosen = ids.slice(0, numberOfCards);
-                if (chosen.length) {
+                if (chosen.length || promptType === PROMPT_TYPE_CHOOSE_UP_TO_N_CARDS_FROM_ZONE || numberOfCards === 0) {
                     return { type: ACTION_RESOLVE_PROMPT, promptType, zone: params.zone, zoneOwner: params.zoneOwner, cards: chosen, player } as any;
                 }
                 break;
