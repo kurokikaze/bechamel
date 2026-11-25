@@ -1,6 +1,6 @@
 {
   "name": "bechamel",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "Magi-Nation Duel bot",
   "license": "MIT",
   "type": "module",
@@ -26,7 +26,7 @@
     "moonlands": ">=0.45.0 <0.46.0"
   },
   "dependencies": {
-    "duel-protocol": "https://github.com/kurokikaze/duel-protocol/releases/download/0.3.5/duel-protocol-0.3.5.tgz",
+    "duel-protocol": "https://github.com/kurokikaze/duel-protocol/releases/download/0.3.6/duel-protocol-0.3.6.tgz",
     "socket.io-client": "^4.8.1",
     "isomorphic-fetch": "^3.0.0"
   },
