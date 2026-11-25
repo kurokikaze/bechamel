@@ -27,13 +27,11 @@ type AttackPattern = {
 export class ActionExtractor {
   public static extractActions(sim: State, playerId: number, opponentId: number, actionLog: ActionOnHold[], previousHash: string, hashBuilder: HashBuilder): SimulationEntity[] {
     if (sim.hasWinner()) return [];
-    if (sim.state.activePlayer !== playerId) {
-      return []
-    }
-
     if (sim.state.prompt) {
+      if (sim.state.promptPlayer !== playerId) return [];
       return ActionExtractor.extractPromptAction(sim, playerId, opponentId, actionLog, previousHash);
     }
+    if (sim.getControllingPlayer() !== playerId) return [];
     const step = sim.state.step
     switch (step) {
       case STEP_NAME.ENERGIZE: {
@@ -148,7 +146,7 @@ export class ActionExtractor {
         attackPatterns.forEach(pattern => {
           const innerSim = sim.clone()
           const source = innerSim.getZone(ZONE_TYPE_IN_PLAY).byId(pattern.from)
-          const target = innerSim.getZone(ZONE_TYPE_IN_PLAY).byId(pattern.to) || innerSim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponentId).byId(pattern.to)
+          const target = innerSim.getZone(ZONE_TYPE_IN_PLAY).byId(pattern.to) || innerSim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponentId).byId(pattern.to) || innerSim.getZone(ZONE_TYPE_ACTIVE_MAGI, playerId).byId(pattern.to)
 
           const additionalAttackers = pattern.add ? [innerSim.getZone(ZONE_TYPE_IN_PLAY).byId(pattern.add)] : []
           if (source && target) {
@@ -1020,10 +1018,14 @@ export class ActionExtractor {
 
   public static canPassAttackStep(sim: State, player: number): boolean {
     const engine = sim as State & { hasRequiredAttack?: (player: number) => boolean };
-    return !engine.hasRequiredAttack?.(player);
+    return !engine.hasRequiredAttack?.(sim.state.activePlayer);
   }
 
   public static getAllAttackPatterns(sim: State, attacker: number, opponent: number): AttackPattern[] {
+    if (sim.getControllingPlayer() === attacker && sim.state.activePlayer !== attacker) {
+      attacker = sim.state.activePlayer;
+      opponent = sim.getOpponent(attacker);
+    }
     const creatures = sim.getZone(ZONE_TYPE_IN_PLAY).cards.filter((card: CardInGame) => card.card.type === TYPE_CREATURE)
     // PROPERTY_CONTROLLER is queried 3Ã— per creature without caching
     const controllerOf = new Map<string, number>()

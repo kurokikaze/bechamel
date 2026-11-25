@@ -292,7 +292,7 @@ export class Simulation {
                 );
             }
 
-            const activePlayer = game.state.prompt ? game.state.promptPlayer : game.state.activePlayer;
+            const activePlayer = game.state.prompt ? game.state.promptPlayer : game.getControllingPlayer();
             const stateBefore = `T${game.turn}S${game.state.step}P${activePlayer}${game.state.prompt ? `(${game.state.promptType?.slice(-20)})` : ''}`;
             if (activePlayer === 1) {
                 strategyConnectorOne.requestAndSendAction();

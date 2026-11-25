@@ -71,6 +71,20 @@ they are needed for local offline play and do not depend on the triage server.
 `src/tests/support/createGame.ts` is a test fixture, not a second production server.
 The production local engine host remains in Waystone.
 
+## Attack control
+
+Both strategies support controlling another player's attack step (Will of
+Orothe). Search preserves the turn owner, enumerates that player's attackers,
+and evaluates combat from the bot's perspective. Passing remains an option
+unless an attack is mandatory. At the attack step, normal engine simulation
+handles interactions such as sacrificing an enemy attacker to Bwill's Karma.
+
+Before that step, the evaluation uses a discounted estimate of attacks prevented
+and enemies that could be traded into Bwill. This helps decide whether to cast
+Will; it does not predict the opponent's intervening spells or powers. The
+forecast is removed once the controlled attack step begins, so actual combat
+and the predicted benefit are not counted together.
+
 ## Distribution
 
 Build before packing; only `dist/` and package metadata/documentation ship.

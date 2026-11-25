@@ -876,12 +876,6 @@ export class SimulationStrategy implements Strategy {
 
                         if (opponentMagi) {
                             const TEMPORARY_OPPONENT_ID = this.gameState.getOpponentId();
-                            const myCreatures = this.gameState.getMyCreaturesInPlay()
-
-                            if (myCreatures.length == 0) {
-                                return this.pass()
-                            }
-
                             const outerSim = createState(
                                 this.gameState,
                                 this.playerId || 2,
@@ -893,7 +887,8 @@ export class SimulationStrategy implements Strategy {
                             simulationQueue.addFromSim(outerSim, this.playerId, TEMPORARY_OPPONENT_ID, [], hash, this.hashBuilder)
                             // const simulationQueue = ActionExtractor.extractActions(outerSim, this.playerId, TEMPORARY_OPPONENT_ID, [], hash, this.hashBuilder)
 
-                            const initialScore = getStateScore(outerSim, this.playerId, TEMPORARY_OPPONENT_ID)
+                            const initialScore = ActionExtractor.canPassAttackStep(outerSim, this.playerId)
+                                ? getStateScore(outerSim, this.playerId, TEMPORARY_OPPONENT_ID) : -Infinity
 
                             const bestAction = this.simulateAttacksQueue(simulationQueue, initialScore, TEMPORARY_OPPONENT_ID)
                             if (!bestAction) {

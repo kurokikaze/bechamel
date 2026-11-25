@@ -1,4 +1,5 @@
 import {State} from 'moonlands/dist/esm/index.js'
+import { PROPERTY_CONTROLLING_PLAYER } from 'moonlands/dist/esm/const.js'
 import {PROPERTY_ATTACKS_PER_TURN, TYPE_CREATURE, ZONE_TYPE_ACTIVE_MAGI, ZONE_TYPE_HAND, ZONE_TYPE_IN_PLAY} from "../const.js"
 
 // Match prompt semantics across engine states and reconstructed client states.
@@ -55,7 +56,12 @@ export class HashBuilder {
       ? `?${sim.state.promptPlayer}:` + this.convertHash(sim.state.promptGeneratedBy || '') + `[${sim.state.promptGeneratedBy}]` +
         JSON.stringify({ type: sim.state.promptType, params: promptValue(sim.state.promptParams) })
       : ''
-    return (sim.state.activePlayer === sim.players[0] ? '*' : 'v') + sim.state.step?.toString() + '{' + handHashes.join(',') + '}' + ourMagiHash + '|' + cardHashes.join('|') + '|' + enemyMagiHash + promptHash
+    const controlEffects = sim.state.continuousEffects.flatMap(effect => {
+      const abilities = (effect.staticAbilities ?? []).filter(ability => ability.property === PROPERTY_CONTROLLING_PLAYER);
+      return abilities.length ? [{ expiration: effect.expiration, abilities }] : [];
+    });
+    const controlHash = controlEffects.length ? `!${sim.getControllingPlayer()}:` + JSON.stringify(promptValue(controlEffects)) : '';
+    return (sim.state.activePlayer === sim.players[0] ? '*' : 'v') + sim.state.step?.toString() + '{' + handHashes.join(',') + '}' + ourMagiHash + '|' + cardHashes.join('|') + '|' + enemyMagiHash + promptHash + controlHash
   }
 
   private convertHash(hash: string): number {

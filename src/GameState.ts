@@ -61,6 +61,7 @@ import {
 } from 'moonlands/dist/esm/const.js'
 import { getCardDetails, getPromptFilter } from './common.js'
 import { tickDownContinuousEffects } from 'duel-protocol/effects'
+import { getControllingPlayer } from './attackControl.js'
 
 
 const nanoid = () => 'new_nanoid'
@@ -158,7 +159,7 @@ export class GameState {
   }
 
   public playerPriority(playerId: number): boolean {
-    return this.state.activePlayer === playerId
+    return getControllingPlayer(this.state) === playerId
   }
 
   public waitingForCardSelection(): boolean {

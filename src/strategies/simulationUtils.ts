@@ -6,6 +6,7 @@ import Zone from 'moonlands/dist/esm/classes/Zone.js'
 import { ZONE_TYPE_HAND, ZONE_TYPE_DECK, ZONE_TYPE_DISCARD, ZONE_TYPE_ACTIVE_MAGI, ZONE_TYPE_MAGI_PILE, ZONE_TYPE_DEFEATED_MAGI, ZONE_TYPE_IN_PLAY, TYPE_CREATURE } from "../const.js";
 import { GameState } from '../GameState.js';
 import Card from 'moonlands/dist/esm/classes/Card.js';
+import { attackControlValue } from './attackControlValue.js';
 
 const addCardData = (card: any) => ({
   ...card,
@@ -108,11 +109,10 @@ export function createState(
     ...defaultState,
     zones,
     step: STEP_ATTACK,
-    activePlayer: playerId,
-    // The engine now validates attack priority against controllingPlayer. The
-    // shared default is 0; leaving it there silently rejects every simulated
-    // attack and pass in the attack step.
-    controllingPlayer: playerId,
+    activePlayer: gameState.state.activePlayer,
+    // Preserve the turn owner; continuous effects may give the bot control of
+    // that player's attacks without changing who owns the turn or creatures.
+    controllingPlayer: gameState.state.activePlayer,
     prompt: false,
     promptParams: {},
     log: [],
@@ -241,5 +241,5 @@ export const getStateScore = (state: State, attacker: number, opponent: number):
       myScore += 1000;
     }
   }
-  return myScore - enemyScore
+  return myScore - enemyScore + (state.hasWinner() ? 0 : attackControlValue(state, attacker))
 }

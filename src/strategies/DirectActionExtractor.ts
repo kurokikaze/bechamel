@@ -118,11 +118,11 @@ export class DirectActionExtractor {
     // -----------------------------------------------------------------------
     public static extractActions(sim: State, playerId: number, opponentId: number): DirectAction[] {
         if (sim.hasWinner()) return []
-        if (sim.state.activePlayer !== playerId) return []
-
         if (sim.state.prompt) {
+            if (sim.state.promptPlayer !== playerId) return []
             return DirectActionExtractor.extractPromptActions(sim, playerId, opponentId)
         }
+        if (sim.getControllingPlayer() !== playerId) return []
 
         switch (sim.state.step) {
             case STEP_NAME.ENERGIZE: return []
@@ -179,7 +179,8 @@ export class DirectActionExtractor {
                 const source = sim.getZone(ZONE_TYPE_IN_PLAY).byId(action.sourceId)
                 const target =
                     sim.getZone(ZONE_TYPE_IN_PLAY).byId(action.targetId) ??
-                    sim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponentId).card
+                    sim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponentId).byId(action.targetId) ??
+                    sim.getZone(ZONE_TYPE_ACTIVE_MAGI, playerId).byId(action.targetId)
                 if (!source || !target) break
                 const additionalAttackers: CardInGame[] = action.additionalAttackerId
                     ? [sim.getZone(ZONE_TYPE_IN_PLAY).byId(action.additionalAttackerId)].filter(Boolean) as CardInGame[]
@@ -382,7 +383,8 @@ export class DirectActionExtractor {
             const source = sim.getZone(ZONE_TYPE_IN_PLAY).byId(pattern.from)
             const target =
                 sim.getZone(ZONE_TYPE_IN_PLAY).byId(pattern.to) ??
-                sim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponentId).card
+                sim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponentId).byId(pattern.to) ??
+                sim.getZone(ZONE_TYPE_ACTIVE_MAGI, playerId).byId(pattern.to)
             const additional = pattern.add ? sim.getZone(ZONE_TYPE_IN_PLAY).byId(pattern.add) : null
 
             if (!source || !target) return
