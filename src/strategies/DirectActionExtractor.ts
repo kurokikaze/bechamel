@@ -117,6 +117,7 @@ export class DirectActionExtractor {
     // descriptors containing only ids/names/numbers — no object references.
     // -----------------------------------------------------------------------
     public static extractActions(sim: State, playerId: number, opponentId: number): DirectAction[] {
+        if (sim.hasWinner()) return []
         if (sim.state.activePlayer !== playerId) return []
 
         if (sim.state.prompt) {

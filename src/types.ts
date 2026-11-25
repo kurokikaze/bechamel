@@ -87,9 +87,13 @@ export type HiddenCard = {
 }
 
 type PromptParamsType = {
+    alternatives?: { name: string; value: string }[];
+    sourceZone?: ZoneType;
+    sourceZoneOwner?: number;
+    targetZones?: ZoneType[];
     cards?: ConvertedCard[];
     source?: CardInGame;
-    magi?: CardInGame;
+    magi?: CardInGame | ConvertedCard | (CardInGame | ConvertedCard)[];
     availableCards?: string[];
     numberOfCards?: number;
     restrictions?: RestrictionObjectType[] | null;

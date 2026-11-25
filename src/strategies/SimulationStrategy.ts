@@ -287,6 +287,10 @@ export class SimulationStrategy implements Strategy {
 
     // Removes hand cards that can no longer be afforded, keeping the sim hand consistent with createState re-evaluation
     private trimHandToAffordable(sim: State, playerId: number): void {
+        // Attachment spells remain in hand until their target prompt resolves.
+        // After paying for Fog Bank it is no longer affordable, but removing it
+        // here makes the pending attach effect refer to a card outside any zone.
+        if (sim.state.prompt) return;
         const magiCard = sim.getZone(ZONE_TYPE_ACTIVE_MAGI, playerId).card
         if (!magiCard) return
         const handZone = sim.getZone(ZONE_TYPE_HAND, playerId)

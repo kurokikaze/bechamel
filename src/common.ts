@@ -23,6 +23,11 @@ import {
 	RESTRICTION_CREATURE_TYPE,
 	RESTRICTION_ENERGY_EQUALS,
 	RESTRICTION_CREATURE_WAS_ATTACKED,
+	RESTRICTION_CREATURE_NAME,
+	RESTRICTION_REGION_IS_NOT,
+	RESTRICTION_EXCEPT_SOURCE,
+	RESTRICTION_CARD_NAME_NOT_IN,
+	RESTRICTION_STATUS,
 
 	SELECTOR_OWN_CREATURES,
 	SELECTOR_OWN_MAGI,
@@ -63,7 +68,7 @@ import {
 
 	STATUS_BURROWED,
 } from 'moonlands/dist/esm/const.js';
-import { PromptParams, PromptType, RestrictionType, StaticAbilityType } from 'moonlands/dist/esm/types/index.js';
+import { RestrictionType, StaticAbilityType } from 'moonlands/dist/esm/types/index.js';
 
 import { ExpandedClientCard, StateRepresentation } from './types.js';
 
@@ -230,14 +235,24 @@ export const UNFILTERED_RELIC_PROMPTS = [
 ];
 
 type CardFilter = (card: ExpandedClientCard) => boolean
-const getRestrictionFilter = (restriction: RestrictionType, value: any): CardFilter => {
+const getRestrictionFilter = (restriction: RestrictionType, value: any, playerId: number): CardFilter => {
 	switch (restriction) {
 		case RESTRICTION_TYPE:
 			return card => card.card.type === value;
 		case RESTRICTION_REGION:
 			return card => card.card.region === value;
+		case RESTRICTION_REGION_IS_NOT:
+			return card => card.card.region !== value;
+		case RESTRICTION_CREATURE_NAME:
+			return card => card.card.name === value;
+		case RESTRICTION_EXCEPT_SOURCE:
+			return card => card.id !== value;
+		case RESTRICTION_CARD_NAME_NOT_IN:
+			return card => Array.isArray(value) && !value.includes(card.card.name);
+		case RESTRICTION_STATUS:
+			return card => Boolean(getByProperty(card, PROPERTY_STATUS, value));
 		case RESTRICTION_CREATURE_TYPE:
-			return card => (card.card.type === TYPE_CREATURE && card.card.name.split(' ').includes(value));
+			return card => (card.card.type === TYPE_CREATURE && card.card.name.split(' ').some(type => Array.isArray(value) ? value.includes(type) : type === value));
 		case RESTRICTION_ENERGY_EQUALS:
 			return card => (card.card.type === TYPE_CREATURE && card.data.energy === value);
 		case RESTRICTION_ENERGY_LESS_THAN:
@@ -245,16 +260,18 @@ const getRestrictionFilter = (restriction: RestrictionType, value: any): CardFil
 		case RESTRICTION_ENERGY_LESS_THAN_STARTING:
 			return card => (card.card.type === TYPE_CREATURE && card.data.energy < card.card.cost);
 		case RESTRICTION_OWN_CREATURE:
-			return card => (card.card.type === TYPE_CREATURE && (card.data.controller || card.owner) === 1);
+			// Gar's tie-break prompt arrives through the protocol with value:'';
+			// the engine resolves it to the prompt controller in its own state.
+			return card => (card.card.type === TYPE_CREATURE && (card.data.controller ?? card.owner) === (typeof value === 'number' ? value : playerId));
 		case RESTRICTION_OPPONENT_CREATURE:
-			return card => (card.card.type === TYPE_CREATURE && (card.data.controller || card.owner) !== 1);
+			return card => (card.card.type === TYPE_CREATURE && (card.data.controller ?? card.owner) !== (typeof value === 'number' ? value : playerId));
 		case RESTRICTION_CREATURE_WAS_ATTACKED:
 			return card => (card.card.type === TYPE_CREATURE && card.data.wasAttacked === true);
 	}
+	return () => false;
 };
 
-// @deprecated Probably not used inside the Bechamel, user ids are hardcoded inside `getRestrictionFilter`
-export const getPromptFilter = (promptType: PromptType, promptParams: PromptParams) => {
+export const getPromptFilter = (promptType: string, promptParams: StateRepresentation['promptParams'], playerId = 1) => {
 	switch (promptType) {
 		case PROMPT_TYPE_RELIC:
 			return card => card.card.type === TYPE_RELIC;
@@ -263,20 +280,21 @@ export const getPromptFilter = (promptType: PromptType, promptParams: PromptPara
 		case PROMPT_TYPE_SINGLE_CREATURE_OR_MAGI:
 			return card => (card.card.type === TYPE_MAGI || card.card.type === TYPE_CREATURE);
 		case PROMPT_TYPE_OWN_SINGLE_CREATURE:
-			return card => (card.data.controller || card.owner) === 1 && card.card.type === TYPE_CREATURE;
+			return card => (card.data.controller ?? card.owner) === playerId && card.card.type === TYPE_CREATURE;
 		case PROMPT_TYPE_ANY_CREATURE_EXCEPT_SOURCE:
-			return card => card.id !== promptParams.source;
+			return card => card.card.type === TYPE_CREATURE && card.id !== (promptParams.source?.id ?? promptParams.source);
 		case PROMPT_TYPE_SINGLE_CREATURE_FILTERED:
 			if (promptParams) {
 				if (promptParams.restrictions && promptParams.restrictions.length) {
-					const checkers = promptParams.restrictions.map(({ type, value }) => getRestrictionFilter(type, value));
+					const checkers = promptParams.restrictions.map(({ type, value }) => getRestrictionFilter(type, value, playerId));
 					return card =>
-						checkers.map(checker => checker(card)).every(a => a === true); // combine checkers
+						card.card.type === TYPE_CREATURE && checkers.every(checker => checker(card));
 				} else {
-					return getRestrictionFilter(promptParams.restriction, promptParams.restrictionValue);
+					const check = promptParams.restriction ? getRestrictionFilter(promptParams.restriction, promptParams.restrictionValue, playerId) : () => true;
+					return card => card.card.type === TYPE_CREATURE && check(card);
 				}
 			} else {
-				return () => true;
+				return card => card.card.type === TYPE_CREATURE;
 			}
 		default:
 			return () => true;

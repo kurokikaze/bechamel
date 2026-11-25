@@ -1,6 +1,7 @@
 import { ClientAction } from 'duel-protocol';
 import { PROMPT_TYPE_RELIC, PROMPT_TYPE_SINGLE_MAGI } from "../const.js";
 import { GameState } from "../GameState.js";
+import { byName } from 'moonlands/dist/esm/cards.js';
 import {
     ACTION_RESOLVE_PROMPT,
     PROMPT_TYPE_SINGLE_CREATURE_FILTERED,
@@ -14,11 +15,15 @@ import {
     PROMPT_TYPE_NUMBER,
     PROMPT_TYPE_PAYMENT_SOURCE,
     PROMPT_TYPE_ALTERNATIVE,
+    PROMPT_TYPE_PLAYER,
+    PROMPT_TYPE_MAGI_WITHOUT_CREATURES,
     PROMPT_TYPE_POWER_ON_MAGI,
     PROMPT_TYPE_REARRANGE_CARDS_OF_ZONE,
     PROMPT_TYPE_REARRANGE_ENERGY_ON_CREATURES,
     PROMPT_TYPE_DISTRIBUTE_ENERGY_ON_CREATURES,
     PROMPT_TYPE_DISTRIBUTE_DAMAGE_ON_CREATURES,
+    PROMPT_TYPE_DISTRIBUTE_CARDS_IN_ZONES,
+    COST_X,
 } from "moonlands/dist/esm/const.js";
 
 class UnexpectedPromptResolver  {
@@ -50,17 +55,26 @@ class UnexpectedPromptResolver  {
                 break;
             }
 
-            case PROMPT_TYPE_SINGLE_MAGI: {
+            case PROMPT_TYPE_SINGLE_MAGI:
+            case PROMPT_TYPE_MAGI_WITHOUT_CREATURES: {
                 const magi = [
                     (state as any).getMyMagi?.(),
                     ...((state as any).state?.zones?.opponentActiveMagi || []),
                 ].filter(Boolean);
-                const candidates = magi;
+                const creatures = promptType === PROMPT_TYPE_MAGI_WITHOUT_CREATURES
+                    ? [...state.getMyCreaturesInPlay(), ...state.getEnemyCreaturesInPlay()]
+                    : [];
+                const candidates = magi.filter(magi => !creatures.some(creature => creature.data.controller === magi.data.controller));
                 if (candidates.length) {
-                    const chosen = candidates.reduce((a: any, b: any) => (a.data.energy <= b.data.energy ? a : b));
+                    // Stab is the current source of this prompt. Prefer an
+                    // exposed opponent over damaging our own undefended Magi.
+                    const opponents = promptType === PROMPT_TYPE_MAGI_WITHOUT_CREATURES
+                        ? candidates.filter(magi => magi.data.controller !== player) : [];
+                    const targets = opponents.length ? opponents : candidates;
+                    const chosen = targets.reduce((a: any, b: any) => (a.data.energy <= b.data.energy ? a : b));
                     return { type: ACTION_RESOLVE_PROMPT, promptType, target: chosen.id, player } as any;
                 }
-                break;
+                throw new Error(`No legal Magi target for ${promptType}`);
             }
 
             case PROMPT_TYPE_RELIC: {
@@ -117,20 +131,35 @@ class UnexpectedPromptResolver  {
 
             case PROMPT_TYPE_ALTERNATIVE: {
                 const alts = (state as any).state?.promptParams?.alternatives || (state as any).state?.promptAvailableCards || [];
-                const first = Array.isArray(alts) && alts.length ? (alts[0].id || alts[0]) : null;
+                const first = Array.isArray(alts) && alts.length ? alts[0].value : null;
                 if (first) return { type: ACTION_RESOLVE_PROMPT, promptType, alternative: first, player } as any;
                 break;
             }
 
             case PROMPT_TYPE_POWER_ON_MAGI: {
-                const magi = (state as any).state?.promptParams?.magi || [];
-                if (magi.length) {
-                    // choose first power if available
-                    const magiCard = magi[0];
-                    const power = magiCard?.card?.data?.powers?.[0]?.name;
-                    if (power) return { type: ACTION_RESOLVE_PROMPT, promptType, power, player } as any;
-                }
-                break;
+                const magi = state.state.promptParams.magi;
+                const source = Array.isArray(magi) ? magi[0] : magi;
+                const definition = typeof source?.card === 'string' ? byName(source.card) : source?.card;
+                const power = definition?.data.powers?.find(power => source && (
+                    power.cost === COST_X ? source.data.energy >= 3
+                        : typeof power.cost === 'number' && power.cost + 2 <= source.data.energy
+                ));
+                if (!power) throw new Error(`No affordable Magi power for ${promptType}`);
+                return { type: ACTION_RESOLVE_PROMPT, promptType, power: power.name, player } as any;
+            }
+            case PROMPT_TYPE_PLAYER:
+                return { type: ACTION_RESOLVE_PROMPT, promptType, targetPlayer: state.getOpponentId(), player } as any;
+
+            case PROMPT_TYPE_DISTRIBUTE_CARDS_IN_ZONES: {
+                const params = state.state.promptParams;
+                const zones = params.targetZones ?? [];
+                const destination = zones.find(zone => zone === params.sourceZone) ?? zones[0];
+                if (!destination || !Array.isArray(params.cards)) break;
+                // Keep the revealed cards in their original zone as a legal default
+                // for Foresight, including a deck with fewer than two cards.
+                const cards = Object.fromEntries(zones.map(zone => [zone, [] as string[]]));
+                cards[destination] = params.cards.map(card => card.id);
+                return { type: ACTION_RESOLVE_PROMPT, promptType, cards, player } as any;
             }
 
             case PROMPT_TYPE_REARRANGE_CARDS_OF_ZONE: {
@@ -185,26 +214,24 @@ class UnexpectedPromptResolver  {
             return { type: ACTION_RESOLVE_PROMPT, promptType: state.getPromptType(), target: first, player } as any;
         }
 
-        // Last resort: resolve with number 0
-        return { type: ACTION_RESOLVE_PROMPT, promptType: state.getPromptType(), number: 0, player } as any;
+        throw new Error(`Cannot resolve prompt ${promptType}: no supported legal reply`);
     }
 
     private resolveCreaturePrompt(state: GameState): ClientAction {
-        const filtered = (state as any).state?.promptParams ? state.getCardsForFilteredPrompt() : [];
+        const promptType = state.getPromptType();
+        const filtered = state.getCardsForFilteredPrompt();
         const own = state.getMyCreaturesInPlay() || [];
-        const candidates = (filtered && filtered.length) ? filtered : (own.length ? own : state.getEnemyCreaturesInPlay() || []);
+        // Never replace an empty filtered set with arbitrary targets.
+        const candidates = promptType === PROMPT_TYPE_SINGLE_CREATURE_FILTERED ? filtered
+            : promptType === PROMPT_TYPE_OWN_SINGLE_CREATURE ? own
+            : [...own, ...(state.getEnemyCreaturesInPlay() || [])];
 
         if (candidates && candidates.length) {
             const chosen = candidates.reduce((a: any, b: any) => (a.data.energy <= b.data.energy ? a : b));
             return { type: ACTION_RESOLVE_PROMPT, promptType: state.getPromptType(), target: chosen.id, player: (state as any).playerId || 0 } as any;
         }
 
-        const available = (state as any).state?.promptAvailableCards || [];
-        if (available && available.length) {
-            return { type: ACTION_RESOLVE_PROMPT, promptType: state.getPromptType(), target: available[0], player: (state as any).playerId || 0 } as any;
-        }
-
-        return { type: ACTION_RESOLVE_PROMPT, promptType: state.getPromptType(), number: 0, player: (state as any).playerId || 0 } as any;
+        throw new Error(`No legal creature target for ${promptType}`);
     }
 }
 

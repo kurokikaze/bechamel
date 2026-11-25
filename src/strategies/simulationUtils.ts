@@ -109,6 +109,10 @@ export function createState(
     zones,
     step: STEP_ATTACK,
     activePlayer: playerId,
+    // The engine now validates attack priority against controllingPlayer. The
+    // shared default is 0; leaving it there silently rejects every simulated
+    // attack and pass in the attack step.
+    controllingPlayer: playerId,
     prompt: false,
     promptParams: {},
     log: [],

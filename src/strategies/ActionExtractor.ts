@@ -26,6 +26,7 @@ type AttackPattern = {
 
 export class ActionExtractor {
   public static extractActions(sim: State, playerId: number, opponentId: number, actionLog: ActionOnHold[], previousHash: string, hashBuilder: HashBuilder): SimulationEntity[] {
+    if (sim.hasWinner()) return [];
     if (sim.state.activePlayer !== playerId) {
       return []
     }
@@ -1035,7 +1036,7 @@ export class ActionExtractor {
     const allOpponentCreatures = creatures.filter((card: CardInGame) => controllerOf.get(card.id) !== attacker)
 
     const enemyMagi = sim.getZone(ZONE_TYPE_ACTIVE_MAGI, opponent).cards[0]
-    const magiCanBeAttacked = sim.modifyByStaticAbilities(enemyMagi, PROPERTY_CAN_BE_ATTACKED)
+    const magiCanBeAttacked = enemyMagi && sim.modifyByStaticAbilities(enemyMagi, PROPERTY_CAN_BE_ATTACKED)
 
     const result: AttackPattern[] = []
     const packHunters = attackers.filter(card => card.card.data.canPackHunt)

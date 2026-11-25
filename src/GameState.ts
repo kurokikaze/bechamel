@@ -42,27 +42,33 @@ import {
 } from './const.js'
 import { byName } from 'moonlands/dist/esm/cards.js'
 import { HiddenCard, ProcessedClientCard, SerializedClientState, StateRepresentation } from './types.js'
-import { ClientAction } from 'duel-protocol'
+import { ClientAction, ClientEnterPromptPowerOnMagi } from 'duel-protocol'
 import { ConvertedCard, HiddenConvertedCard } from 'moonlands/dist/esm/classes/CardInGame.js'
 import {
   EFFECT_TYPE_REMOVE_ENERGY_FROM_MAGI,
   EFFECT_TYPE_REMOVE_ENERGY_FROM_CREATURE,
   REGION_UNIVERSAL,
   EFFECT_TYPE_DISCARD_RESHUFFLED,
-  RESTRICTION_CREATURE_NAME,
-  RESTRICTION_ENERGY_EQUALS,
-  RESTRICTION_OWN_CREATURE,
   EFFECT_TYPE_ENERGY_DISCARDED_FROM_CREATURE,
   EFFECT_TYPE_ENERGY_DISCARDED_FROM_MAGI,
   PROMPT_TYPE_PAYMENT_SOURCE,
   PROMPT_TYPE_REARRANGE_CARDS_OF_ZONE,
+  PROMPT_TYPE_ALTERNATIVE,
+  PROMPT_TYPE_DISTRIBUTE_CARDS_IN_ZONES,
+  PROMPT_TYPE_POWER_ON_MAGI,
   EFFECT_TYPE_PROMPT_ENTERED,
 } from 'moonlands/dist/esm/const.js'
-import { getCardDetails } from './common.js'
+import { getCardDetails, getPromptFilter } from './common.js'
 import { tickDownContinuousEffects } from 'duel-protocol/effects'
 
 
 const nanoid = () => 'new_nanoid'
+// Protocol 0.3.2 declares the enter-prompt shape but omits its effect variant.
+type PowerPromptEffect = Omit<ClientEnterPromptPowerOnMagi, 'type'> & {
+  type: typeof ACTION_EFFECT;
+  effectType: typeof EFFECT_TYPE_PROMPT_ENTERED;
+  generatedBy: string;
+};
 const zonesToConsiderForStaticAbilities = new Set(['inPlay', 'opponentInPlay', 'playerActiveMagi', 'opponentActiveMagi'])
 
 export interface SimplifiedCard {
@@ -107,8 +113,6 @@ type Card = {
   },
   owner: number
 }
-
-type ProcessedCardFilter = (card: ProcessedClientCard, id: number, arr: ProcessedClientCard[]) => boolean
 
 export const findInPlay = (state: StateRepresentation, id: string) => {
   const cardPlayerInPlay = state.zones.inPlay.find(card => card.id === id);
@@ -233,44 +237,6 @@ export class GameState {
       .filter<ProcessedClientCard>((card): card is ProcessedClientCard => card._card?.type === TYPE_RELIC && card.data.controller === this.playerId)
   }
 
-  private makeProcessedCardFilter(): ProcessedCardFilter {
-    if (this.state.promptParams.restriction) {
-      // Simple filter
-      switch (this.state.promptParams.restriction) {
-        case RESTRICTION_CREATURE_NAME: {
-          return (card: ProcessedClientCard) => card.card.name === this.state.promptParams.restrictionValue;
-        }
-        default: {
-          return () => false;
-        }
-      }
-    } else {
-      // Right now - only Gar's
-      return (card: ProcessedClientCard) => {
-        if (!(this.state.promptParams.restrictions instanceof Array)) return true
-
-        for (let restriction of this.state.promptParams.restrictions) {
-          switch (restriction.type) {
-            case RESTRICTION_OWN_CREATURE: {
-              if (card.data.controller !== this.playerId || card.card.type !== TYPE_CREATURE) {
-                return false;
-              }
-              break;
-            }
-            case RESTRICTION_ENERGY_EQUALS: {
-              if (card.data.energy !== restriction.value) {
-                return false;
-              }
-              break;
-            }
-          }
-        }
-
-        return true;
-      };
-    }
-  }
-
   public getMyDeckCards(): string[] {
     return this.state.zones.playerDeck.map(({ id }) => id);
   }
@@ -286,8 +252,9 @@ export class GameState {
   }
 
   public getCardsForFilteredPrompt(): ProcessedClientCard[] {
+    if (!this.state.promptType) return [];
     const realState = getCardDetails(this.state)
-    const filter = this.makeProcessedCardFilter()
+    const filter = getPromptFilter(this.state.promptType, this.state.promptParams, this.playerId)
     return realState.inPlay.map(card => ({
       ...card,
       _card: card.card,
@@ -514,7 +481,7 @@ export class GameState {
     }
   }
 
-  private applyEffect(state: StateRepresentation, action: ClientAction): StateRepresentation {
+  private applyEffect(state: StateRepresentation, action: ClientAction | PowerPromptEffect): StateRepresentation {
     if (!('effectType' in action)) {
       return state;
     }
@@ -750,10 +717,26 @@ export class GameState {
         return newState;
       }
       case EFFECT_TYPE_PROMPT_ENTERED: {
-        var promptParams = {};
+        var promptParams = 'promptParams' in action ? { ...action.promptParams } : {};
         var energyPrompt = state.energyPrompt;
 
         switch (action.promptType) {
+          case PROMPT_TYPE_POWER_ON_MAGI: {
+            promptParams = { magi: action.magi };
+            break;
+          }
+          case PROMPT_TYPE_DISTRIBUTE_CARDS_IN_ZONES: {
+            promptParams = {
+              ...action.promptParams,
+              // Protocol exposes the revealed cards beside promptParams.
+              cards: action.cards,
+            };
+            break;
+          }
+          case PROMPT_TYPE_ALTERNATIVE: {
+            promptParams = { alternatives: 'alternatives' in action ? action.alternatives : action.promptParams.alternatives };
+            break;
+          }
           case PROMPT_TYPE_NUMBER: {
             promptParams = {
               min: action.min,

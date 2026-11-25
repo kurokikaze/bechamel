@@ -698,34 +698,6 @@ export class ReconSimulationStrategy implements Strategy {
                 }
             }
 
-            if (this.gameState.isInPromptState(this.playerId) && this.gameState.getPromptType() === PROMPT_TYPE_OWN_SINGLE_CREATURE) {
-                const available = this.gameState.state.promptAvailableCards as { id: string }[]
-                const creature = available[0] ?? this.gameState.getMyCreaturesInPlay()[0]
-                if (creature) {
-                    return this.resolveTargetPrompt(creature.id)
-                }
-                // no own creatures: sending a non-creature (e.g. magi) crashes the moonlands
-                // restriction check. Pass priority so the spell fizzles.
-                return this.pass()
-            }
-
-            if (this.gameState.isInPromptState(this.playerId) && (
-                this.gameState.getPromptType() === PROMPT_TYPE_SINGLE_CREATURE_FILTERED ||
-                this.gameState.getPromptType() === PROMPT_TYPE_SINGLE_CREATURE
-            )) {
-                const available = this.gameState.state.promptAvailableCards as { id: string }[] | null
-                const creature = available?.[0]
-                    ?? this.gameState.getMyCreaturesInPlay()[0]
-                    ?? this.gameState.getEnemyCreaturesInPlay()[0]
-                if (creature) {
-                    return this.resolveTargetPrompt(creature.id)
-                }
-                // no valid creature — resolve with own magi to let the spell fizzle gracefully
-                const myMagi = this.gameState.getMyMagi()
-                if (myMagi) return this.resolveTargetPrompt(myMagi.id)
-                return this.resolveTargetPrompt('') // last resort
-            }
-
             if (this.waitingTarget && this.gameState.waitingForTarget(this.waitingTarget.source, this.playerId)) {
                 return this.resolveTargetPrompt(this.waitingTarget.target, 'waitingTarget')
             }
