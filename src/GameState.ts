@@ -553,10 +553,11 @@ export class GameState {
         };
       }
       case EFFECT_TYPE_REMOVE_ENERGY_FROM_MAGI: {
+        const ids = (Array.isArray(action.target) ? action.target : [action.target]).map(card => card.id);
         const playerActiveMagi = [...(state.zones.playerActiveMagi || [])]
-          .map(card => card.id == action.target.id ? { ...card, data: { ...card.data, energy: card.data.energy - action.amount } } : card);
+          .map(card => ids.includes(card.id) ? { ...card, data: { ...card.data, energy: card.data.energy - action.amount } } : card);
         const opponentActiveMagi = [...(state.zones.opponentActiveMagi || [])]
-          .map(card => card.id == action.target.id ? { ...card, data: { ...card.data, energy: card.data.energy - action.amount } } : card);
+          .map(card => ids.includes(card.id) ? { ...card, data: { ...card.data, energy: card.data.energy - action.amount } } : card);
 
         return {
           ...state,
@@ -659,10 +660,11 @@ export class GameState {
         };
       }
       case EFFECT_TYPE_ADD_ENERGY_TO_MAGI: {
+        const ids = (Array.isArray(action.target) ? action.target : [action.target]).map(card => card.id);
         const playerActiveMagi = [...(state.zones.playerActiveMagi || [])]
-          .map(card => card.id == action.target.id ? { ...card, data: { ...card.data, energy: card.data.energy + action.amount } } : card);
+          .map(card => ids.includes(card.id) ? { ...card, data: { ...card.data, energy: card.data.energy + action.amount } } : card);
         const opponentActiveMagi = [...(state.zones.opponentActiveMagi || [])]
-          .map(card => card.id == action.target.id ? { ...card, data: { ...card.data, energy: card.data.energy + action.amount } } : card);
+          .map(card => ids.includes(card.id) ? { ...card, data: { ...card.data, energy: card.data.energy + action.amount } } : card);
 
         return {
           ...state,
