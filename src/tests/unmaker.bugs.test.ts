@@ -790,13 +790,13 @@ describe('Unmaker bug – POWER move_cards_between_zones + draw_n_cards (Cloud S
 });
 
 // ---------------------------------------------------------------------------
-// Arderial bug H – POWER: Eye of the Storm Energy Boost (roll = 1)
+// Arderial bug H – POWER: Eye of the Storm Storm Seeker (roll = 1)
 //   When the die shows 1, effects/move_cards_between_zones moves the hand to
 //   discard.  This effect is not handled by the Unmaker.
 //   PRNG seed 7 produces roll = 1 for this power.
 // ---------------------------------------------------------------------------
 describe('Unmaker bug – POWER with move_cards_between_zones discard hand (Eye of the Storm roll=1)', () => {
-    it('reverts state correctly after Energy Boost discards the hand', () => {
+    it('reverts state correctly after Storm Seeker discards the hand', () => {
         const eye = new CardInGame(byName('Eye of the Storm') as Card, PLAYER);
         const adis = new CardInGame(byName('Adis') as Card, PLAYER).addEnergy(10);
         const sinder = new CardInGame(byName('Sinder') as Card, OPPONENT).addEnergy(6);
@@ -808,7 +808,7 @@ describe('Unmaker bug – POWER with move_cards_between_zones discard hand (Eye 
         state.initiatePRNG(7); // seed 7 → die rolls 1 → discard hand path
         const before = snapshot(state);
 
-        const power = (eye.card.data.powers as any[]).find(p => p.name === 'Energy Boost');
+        const power = (eye.card.data.powers as any[]).find(p => p.name === 'Storm Seeker');
         const unmaker = new Unmaker(state);
         unmaker.setCheckpoint();
 

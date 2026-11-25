@@ -26,6 +26,7 @@ import {
   EFFECT_TYPE_END_OF_TURN,
   EFFECT_TYPE_FORBID_ATTACK_TO_CREATURE,
   EFFECT_TYPE_MOVE_ENERGY,
+  EFFECT_TYPE_DISTRIBUTE_ENERGY_ON_CREATURES,
   EFFECT_TYPE_REARRANGE_ENERGY_ON_CREATURES,
   EFFECT_TYPE_START_OF_TURN,
   EFFECT_TYPE_DRAW,
@@ -668,6 +669,18 @@ export class GameState {
             ...state.zones,
             playerActiveMagi,
             opponentActiveMagi,
+          },
+        };
+      }
+      case EFFECT_TYPE_DISTRIBUTE_ENERGY_ON_CREATURES: {
+        return {
+          ...state,
+          zones: {
+            ...state.zones,
+            inPlay: state.zones.inPlay.map(card =>
+              byName(card.card)?.type === TYPE_CREATURE && card.id in action.energyOnCreatures
+                ? { ...card, data: { ...card.data, energy: card.data.energy + action.energyOnCreatures[card.id] } }
+                : card),
           },
         };
       }
