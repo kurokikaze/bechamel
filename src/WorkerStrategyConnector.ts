@@ -1,18 +1,6 @@
-import { ACTION_RESOLVE_PROMPT } from "moonlands"
 import { GameState } from "./GameState.js"
-import { PROMPT_TYPE_CHOOSE_N_CARDS_FROM_ZONE, PROMPT_TYPE_CHOOSE_UP_TO_N_CARDS_FROM_ZONE, PROMPT_TYPE_SINGLE_CREATURE_FILTERED } from "./const.js"
 import { Strategy } from './strategies/Strategy.js'
-import { ClientResolvePromptAction } from 'duel-protocol'
 import { ErrorDumpService } from './diagnostics.js'
-
-const STEP_NAMES: Record<number, string> = {
-  0: 'Energize',
-  1: 'Power/Relic/Spell (1)',
-  2: 'Attack',
-  3: 'Creatures',
-  4: 'Power/Relic/Spell (2)',
-  5: 'Draw',
-}
 
 export class WorkerStrategyConnector {
   private playerId?: number
@@ -75,78 +63,19 @@ export class WorkerStrategyConnector {
   }
 
   private requestAndSendAction() {
-    if (!this.gameState || !this.playerId) {
+    if (!this.gameState || !this.playerId || !this.strategy) {
       return
     }
+    // Prompts can interrupt any step, including Draw and the opponent's turn.
+    // The strategy already handles prompt resolution; do not restrict it to Gar.
     const inPromptState = this.gameState.isInPromptState(this.playerId)
-    const currentStep = this.gameState.getStep()
-    if (this.strategy && this.gameState && this.playerId &&
-      (this.gameState.playerPriority(this.playerId) || inPromptState)
-    ) {
-      if (currentStep !== 5 && this.gameState.playerPriority(this.playerId)) {
-        // console.log(`Step is ${STEP_NAMES[currentStep]}, ${inPromptState ? 'in prompt state ' : ''} requesting action`)
-        const action = this.strategy.requestAction()
-        if (action) {
-          console.log(`Thinking is done, chosen action is:`)
-          console.dir(action);
-          postMessage(action)
-        } else {
-          console.log('No action returned from request')
-        }
-      } else if (!this.gameState.playerPriority(this.playerId) && inPromptState) {
-        console.log('Prompted outside of our turn.');
-        switch (this.gameState.getPromptType()) {
-          case PROMPT_TYPE_CHOOSE_N_CARDS_FROM_ZONE: {
-            const cards = this.gameState.state.promptParams.cards || [];
-            const resultCards = cards?.slice(0, this.gameState.state.promptParams.numberOfCards);
-            postMessage({
-              type: ACTION_RESOLVE_PROMPT,
-              promptType: PROMPT_TYPE_CHOOSE_N_CARDS_FROM_ZONE,
-              zone: this.gameState.state.promptParams.zone,
-              zoneOwner: this.gameState.state.promptParams.zoneOwner,
-              cards: resultCards.map(({ id }) => id),
-              generatedBy: this.gameState.state.promptGeneratedBy,
-              player: this.playerId,
-            });
-            break;
-          }
-          // This is probably a Giant Vulbor
-          case PROMPT_TYPE_CHOOSE_UP_TO_N_CARDS_FROM_ZONE: {
-            postMessage({
-              type: ACTION_RESOLVE_PROMPT,
-              promptType: PROMPT_TYPE_CHOOSE_UP_TO_N_CARDS_FROM_ZONE,
-              zone: this.gameState.state.promptParams.zone,
-              zoneOwner: this.gameState.state.promptParams.zoneOwner,
-              cards: [],
-              generatedBy: this.gameState.state.promptGeneratedBy,
-              player: this.playerId,
-            });
-            break;
-          }
-          default:
-            console.log(`We are prompted outside of our turn, the prompt type is ${this.gameState.getPromptType()}`)
-        }
-      } else if (currentStep == 5 && this.gameState.playerPriority(this.playerId) && inPromptState) {
-        // This is a special case for Gar trigger
-        switch (this.gameState.getPromptType()) {
-          case PROMPT_TYPE_SINGLE_CREATURE_FILTERED: {
-            const cards = this.gameState.getCardsForFilteredPrompt();
-            postMessage({
-              type: ACTION_RESOLVE_PROMPT,
-              promptType: PROMPT_TYPE_SINGLE_CREATURE_FILTERED,
-              zone: this.gameState.state.promptParams.zone,
-              zoneOwner: this.gameState.state.promptParams.zoneOwner,
-              target: cards[0].id,
-              generatedBy: this.gameState.state.promptGeneratedBy,
-              player: this.playerId,
-            } as ClientResolvePromptAction);
-            break;
-          }
-          default: {
-            console.log(`We are prompted on the DRAW step, the prompt type is ${this.gameState.getPromptType()}`)
-          }
-        }
-
+    const canAct = this.gameState.playerPriority(this.playerId) && !this.gameState.state.prompt && this.gameState.getStep() !== 5
+    if (inPromptState || canAct) {
+      const action = this.strategy.requestAction()
+      if (action) {
+        postMessage(action)
+      } else {
+        console.log('No action returned from request')
       }
     }
   }
