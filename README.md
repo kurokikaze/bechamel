@@ -31,7 +31,7 @@ all consumers aligned. The sibling `moonlands` working tree is unchanged.
 
 | Import | Contents |
 | --- | --- |
-| `bechamel` | GameState, SimulationStrategy, RandomStrategy, Strategy and state types, configureDiagnostics |
+| `bechamel` | BotSession, BotMessage, GameState, SimulationStrategy, RandomStrategy, Strategy and state types, configureDiagnostics |
 | `bechamel/worker` | WorkerStrategyConnector; browser worker globals are used when connected |
 | `bechamel/node` | StrategyConnector, GameConnector, ReconSimulationStrategy (uses Node crypto) |
 | `bechamel/simulation` | Simulation class and its configuration/result types |
@@ -44,6 +44,35 @@ through `npm start -- <username> <deckId>`; it still targets the local legacy se
 Diagnostic reporting defaults to console output. Hosts can call
 `configureDiagnostics({ dumpActionFailure, dumpGameState })` to supply persistence.
 Waystone injects its existing Tauri-aware ErrorDumpService inside the bot worker.
+
+## Shared bot protocol endpoint
+
+`BotSession` owns the player's client state and the strategy. Waystone's
+`WorkerStrategyConnector`, the legacy Socket.IO `StrategyConnector`, and triage
+all use this endpoint. Transports do not implement their own prompt handlers.
+
+`session.handleMessage(message)` accepts the same messages in every host:
+
+- `special/setup` with `playerId` and that player's serialized state initializes
+  the strategy and may return its opening action.
+- Protocol events update the client state without requesting an action.
+- `display/priority` with the player's ID requests an action after the engine
+  finishes its event sequence. Prompts take precedence over normal turn control,
+  including Draw Step and prompts during the opponent's turn.
+
+The result is an outgoing protocol action or `null` when no action is due.
+The host must forward the opening action too. The legacy synchronous Socket.IO
+harness buffers it until `requestAndSendAction()` so both players can finish
+initializing before an outgoing action re-enters the engine.
+
+An eligible strategy returning no action, an action for another player, or a
+non-prompt action during a prompt produces an error and diagnostic report in
+every host. Strategy/state-update exceptions propagate rather than being hidden.
+The shared root module uses no worker globals, Node-only imports or networking.
+
+Regression tests run Fossik, Gar, and Giant Vulbor through worker, headless and
+Socket.IO adapters. Triage still owns deterministic seeds, package isolation,
+engine execution, time limits, logs and MongoDB persistence.
 
 ## Simulation and triage
 

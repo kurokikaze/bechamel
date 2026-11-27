@@ -1,4 +1,6 @@
 export { GameState } from './GameState.js';
+export { BotSession } from './BotSession.js';
+export type { BotMessage } from './BotSession.js';
 export { SimulationStrategy } from './strategies/SimulationStrategy.js';
 export { RandomStrategy } from './strategies/RandomStrategy.js';
 export { configureDiagnostics } from './diagnostics.js';

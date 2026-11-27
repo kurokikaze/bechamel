@@ -1,7 +1,30 @@
 import { jest } from '@jest/globals';
 import { Simulation, type SimulationResult } from './simulation.js';
+import Card from 'moonlands/dist/esm/classes/Card.js';
+import { cards } from 'moonlands/dist/esm/cards.js';
+import { TYPE_CREATURE, TYPE_MAGI, REGION_NAROOM } from 'moonlands/dist/esm/const.js';
 
 describe('Simulation class', () => {
+    it.each(['simulation', 'recon'] as const)('runs a complete %s match through the legacy transport and shared session', strategy => {
+        const definitions = [
+            new Card('Session Test Magi A', TYPE_MAGI, REGION_NAROOM, null, { startingEnergy: 10, energize: 0, startingCards: ['Session Test Creature'] }),
+            new Card('Session Test Magi B', TYPE_MAGI, REGION_NAROOM, null, { startingEnergy: 1, energize: 0, startingCards: ['Session Test Creature'] }),
+            new Card('Session Test Creature', TYPE_CREATURE, REGION_NAROOM, 2, {}),
+        ];
+        cards.push(...definitions);
+        const logs = ['log', 'dir', 'error', 'warn'].map(level => jest.spyOn(console, level as 'log').mockImplementation(() => {}));
+        try {
+            const result = new Simulation({ rng: 2053, strategy, maxIterations: 100,
+                playerOne: { name: 'A', cards: ['Session Test Magi A', ...Array(4).fill('Session Test Creature')] },
+                playerTwo: { name: 'B', cards: ['Session Test Magi B', ...Array(4).fill('Session Test Creature')] },
+            }).run();
+            expect(result.winner).toBe(1);
+        } finally {
+            logs.forEach(log => log.mockRestore());
+            for (const card of definitions) cards.splice(cards.indexOf(card), 1);
+        }
+    });
+
     const buildSimulation = () => new Simulation({
         rng: 2053,
         writeLogs: false,
