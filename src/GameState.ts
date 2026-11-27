@@ -222,6 +222,10 @@ export class GameState {
     return this.state.zones.playerHand.filter(card => {
       const cardData = byName(card.card);
       if (!cardData) return false;
+      if (cardData.type === TYPE_RELIC && this.state.zones.setAside?.some(relic =>
+        relic.card === card.card && relic.data.setAsideUnder?.blockedPlayer === this.playerId &&
+        this.state.zones.inPlay.some(source => source.id === relic.data.setAsideUnder?.cardId)
+      )) return false;
       if (cardData.type === TYPE_RELIC && (cardData.region !== magiCard.region) && cardData.region !== REGION_UNIVERSAL) return false;
       if (typeof cardData.cost !== 'number') return true;
       const regionTax = (magiCard.region === cardData.region) ? 0 : 1;
